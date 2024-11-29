@@ -9,7 +9,7 @@ const createCategoryInto = catchAsync(async (req, res) => {
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: "Category added successfully",
+      message: "Category created successfully.",
       data: result,
     });
   });
@@ -54,25 +54,31 @@ const createCategoryInto = catchAsync(async (req, res) => {
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: `${result?.isActive?"Successfully Deactivated.":"Successfully Activated."}`,
+      message: `${result?.isActive?"Category inactivation was successful.":"Category activation was successful."}`,
       data: result,
     });
   });
-  const getAllActiveCategories = catchAsync(async (req, res) => {
-    const result = await CategoryServices.getAllActiveCategoriesDB()
+  const updateCategoryApprovedStatus = catchAsync(async (req, res) => {
+    const { categoryId } = req.params;
+ 
+    const result = await CategoryServices.updateCategoryApprovedStatusDB(
+      categoryId,
+    );
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
-      message: "Successfully fetched all active categories.",
+      message: "Category approval successful.",
       data: result,
     });
   });
+  
   export const CategoryControllers = {
    createCategoryInto,
    getAllCategories,
    getSingleCategory,
    updateCategoryInto,
    updateCategoryStatus,
-   getAllActiveCategories
+   updateCategoryApprovedStatus,
+  
   };
   

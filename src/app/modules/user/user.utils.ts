@@ -2,11 +2,9 @@ import { User } from "./user.model";
 
 export const findLastFacultyId = async () => {
     const lastFaculty = await User.findOne(
+      {},
       {
-        role: 'faculty',
-      },
-      {
-        id: 1,
+        userId: 1,
         _id: 0,
       },
     )
@@ -15,20 +13,22 @@ export const findLastFacultyId = async () => {
       })
       .lean();
   
-    return lastFaculty?.id ? lastFaculty.id : undefined;
+    return lastFaculty?.userId ? lastFaculty.userId : undefined;
   };
   
   export const generateFacultyId = async () => {
-    let currentId = (0).toString();
     const lastFacultyId = await findLastFacultyId();
-  
-    if (lastFacultyId) {
-      currentId = lastFacultyId.split("-")[1] ;
-    }
-  
-    let incrementId = (Number(currentId) + 1).toString();
-  
-    incrementId = `CSE${new Date().getFullYear()}F-${incrementId}`;
-  
-    return incrementId;
+
+    // Extract the numeric part of the last Faculty ID, or start from 0 if no ID exists
+    const currentIdNumber = lastFacultyId
+      ? parseInt(lastFacultyId.split("F")[1], 10)
+      : 0;
+
+    // Increment the ID
+    const newIdNumber = currentIdNumber + 1;
+
+    // Generate the new Faculty ID
+    const newFacultyId = `CSE${new Date().getFullYear()}F${newIdNumber.toString().padStart(3, "0")}`;
+
+    return newFacultyId;
   };

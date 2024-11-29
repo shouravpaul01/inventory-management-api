@@ -14,34 +14,28 @@ const categorySchema = new Schema<TSubCategory, SubCatModel>(
       ref: "Category",
       required: true,
     },
-    code: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-      uppercase: true,
-    },
+
     description: {
       type: String,
     },
     isActive: {
       type: Boolean,
-      default: true,
+      default: false,
+    },
+    isApproved: {
+      type: Boolean,
+      default: false,
     },
   },
   {
     timestamps: true,
-    
   }
 );
-categorySchema.statics.isSubCatNameExists =
-  async function isSubCatNameExists(name: string) {
-    return await this.findOne({ name: name });
-  };
-categorySchema.statics.isSubCatCodeExists =
-  async function isSubCatCodeExists(code: string) {
-    return await this.findOne({ code: code });
-  };
+categorySchema.statics.isSubCatNameExists = async function isSubCatNameExists(
+  name: string
+) {
+  return await this.findOne({ name: name });
+};
 export const SubCategory = model<TSubCategory, SubCatModel>(
   "SubCategory",
   categorySchema

@@ -1,24 +1,28 @@
-import mongoose, { Schema, Document, model } from "mongoose";
+import  { Schema, model } from "mongoose";
 import { TUser, UserModel } from "./user.interface";
 import bcrypt from "bcrypt";
 import config from "../../config";
+import { number } from "zod";
 
 const userSchema = new Schema<TUser,UserModel>(
   {
-    id: { type: String, required: true, unique: true },
+    userId: { type: String, required: true, unique: true },
+    faculty:{type:Schema.Types.ObjectId,ref:"Faculty",required:true},
+    email:{type: String, required: true},
     password: { type: String, required: true, select: false },
+    otp: { type: Number,select:false },
     needChangePassword: { type: Boolean, default: true },
     role: {
       type: String,
-      enum: ["admin", "faculty"],
-      default: "faculty",
+      enum: ["Admin", "Faculty"],
+      default: "Faculty",
     },
 
     userAccess: {
       type: [String],
     },
     isApproved: { type: Boolean, default: false },
-    isActive: { type: Boolean, default: false },
+    isBlocked: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
   },
   {
@@ -27,11 +31,11 @@ const userSchema = new Schema<TUser,UserModel>(
 );
 
 userSchema.pre("save", async function (next) {
-  this.password = await bcrypt.hash(this.password, Number(config.saltRounds));
+  this.password = await bcrypt.hash(this.password, Number(config.bcrypt_salt_rounds));
   next();
 });
 userSchema.statics.isUserExists=async function(userId:string) {
-  return await User.findById(userId)
+  return await User.findOne({userId})
 }
 
 export const User = model<TUser,UserModel>("User", userSchema);

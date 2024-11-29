@@ -14,8 +14,9 @@ router.post(
 );
 router.get('/',SubCatControllers.getAllSubCategories)
 router.get('/single-sub-category/:subCategoryId',SubCatControllers.getSingleSubCategory)
-router.patch('/:subCategoryId',validateRequest(SubCatValidationSchema),SubCatControllers.updateSubCategoryInto)
+router.patch('/update-sub-category/:subCategoryId',validateRequest(SubCatValidationSchema),SubCatControllers.updateSubCategoryInto)
 router.patch('/update-active-status/:subCategoryId',SubCatControllers.updateSubCategoryStatus)
+router.patch('/update-approved-status/:subCategoryId',SubCatControllers.updateSubCategoryApprovedStatus)
 router.get('/all-active',SubCatControllers.getAllSubCategories)
 
 export const SubCatRoutes=router

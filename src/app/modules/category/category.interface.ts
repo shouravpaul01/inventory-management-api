@@ -1,13 +1,12 @@
 import { Model } from "mongoose";
 
-export type TCategory ={
-    name: string;
-    code:string;
-    description?: string;
-    isActive:boolean
-  }
+export type TCategory = {
+  name: string;
+  description?: string;
+  isActive: boolean;
+  isApproved: boolean;
+};
 
-  export interface CategoryModel extends Model<TCategory>{
-    isCategoryNameExists(name:string):Promise<TCategory | null>
-    isCategoryCodeExists(code:string):Promise<TCategory | null>
-  }
+export interface CategoryModel extends Model<TCategory> {
+  isCategoryNameExists(name: string): Promise<TCategory | null>;
+}

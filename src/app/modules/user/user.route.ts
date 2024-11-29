@@ -6,6 +6,11 @@ import {UserValidations} from '../user/user.validation'
 const router=express.Router()
 
 router.post("/create-faculty",validateRequest(FacultyValidations.createFacultySchemaValidation),UserControllers.createFaculty)
-router.post("/update-approved-status/:userId",validateRequest(UserValidations.updateApprovedStatusValidation),UserControllers.updateUserApprovedStatus)
-router.post("/update-active-status/:userId",validateRequest(UserValidations.updateActiveStatusValidation),UserControllers.updateUserActiveStatus)
+router.get("/",UserControllers.getAllUsers)
+router.get("/single-user/:userIdOrEmail",UserControllers.getSingleUser)
+router.patch("/update-role/:userId",UserControllers.updateUserRole)
+router.patch("/update-user/:userId",UserControllers.updateUser)
+router.patch("/update-blocked-status/:userId",UserControllers.updateUserBlockedStatus)
+router.delete("/delete-user/:userId",UserControllers.deleteUser)
+router.patch("/restore-user/:userId",UserControllers.restoreUser)
 export const UserRoutes=router

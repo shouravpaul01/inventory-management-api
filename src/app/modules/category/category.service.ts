@@ -8,15 +8,13 @@ const createCategoryIntoDB = async (payload: TCategory) => {
   if (await Category.isCategoryNameExists(payload.name)) {
     throw new AppError(httpStatus.UNPROCESSABLE_ENTITY,"name","Name already exists."); 
   }
-  if (await Category.isCategoryCodeExists(payload.code)){
-    throw new AppError(httpStatus.UNPROCESSABLE_ENTITY,"code","Code already exists."); 
-  }
+ 
   const result = await Category.create(payload);
   return result;
 };
 const getAllCategoriesDB = async (query: Record<string, unknown>) => {
  const searchableFields=["name","code"]
-  const mainQuery = new QueryBuilder(Category.find({}), query).search(
+  const mainQuery = new QueryBuilder(Category.find({}), query).filter().search(
     searchableFields
   );
 
@@ -44,7 +42,10 @@ const updateCategoryIntoDB = async (
   return result;
 };
 const updateCategoryStatusDB = async (categoryId: string, isActive: boolean) => {
-  
+  const isCategoryExists=await Category.findById(categoryId)
+  if (!isCategoryExists) {
+    throw new AppError(httpStatus.NOT_FOUND,"categoryError","Category does not exist.")
+  }
   const result = await Category.findByIdAndUpdate(
     categoryId,
     { isActive: isActive },
@@ -52,15 +53,24 @@ const updateCategoryStatusDB = async (categoryId: string, isActive: boolean) => 
   );
   return result;
 };
-const getAllActiveCategoriesDB = async () => {
-  const result = await Category.find({ isActive: true });
+const updateCategoryApprovedStatusDB = async (categoryId: string) => {
+  const isCategoryExists=await Category.findById(categoryId)
+  if (!isCategoryExists) {
+    throw new AppError(httpStatus.NOT_FOUND,"categoryError","Category does not exist.")
+  }
+  const result = await Category.findByIdAndUpdate(
+    categoryId,
+    { isApproved: true,isActive:true },
+    { new: true }
+  );
   return result;
 };
+
 export const CategoryServices = {
   createCategoryIntoDB,
   getAllCategoriesDB,
   getSingleCategoryDB,
   updateCategoryIntoDB,
   updateCategoryStatusDB,
-  getAllActiveCategoriesDB,
+  updateCategoryApprovedStatusDB,
 };

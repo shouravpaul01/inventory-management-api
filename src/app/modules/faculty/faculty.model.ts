@@ -9,14 +9,12 @@ const publicationSchema = new Schema<TPublication>({
   doi: { type: String },
 });
 const facultySchema = new Schema<TFaculty>({
-  id: { type: String, required: true },
-  user:{type:Schema.Types.ObjectId,ref:"User",required:true},
-  name: { type: String, required: true },
+  userId: { type: String, required: true },
+  name: { type: String, required: true,set: (name: string) => name.replace(/\b\w/g, (char) => char.toUpperCase()), },
   image: { type: String },
   designation: { type: String, required: true },
   department: {
     type: String,
-    default: "Computer Science and Engineering(CSE)",
   },
   roomNo: { type: Number, required: true },
   email: { type: String, required: true },

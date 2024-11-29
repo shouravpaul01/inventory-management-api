@@ -9,8 +9,8 @@ export type TPublication = {
 };
 
 export type TFaculty = {
-  id: string;
-  user?:Types.ObjectId;
+  userId: string;
+
   name: string;
   image?: string;
   designation: string;

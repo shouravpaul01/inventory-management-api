@@ -13,18 +13,12 @@ const createSubCategoryIntoDB = async (payload: TSubCategory) => {
       "Name already exists."
     );
   }
-  if (await SubCategory.isSubCatCodeExists(payload.code)) {
-    throw new AppError(
-      httpStatus.UNPROCESSABLE_ENTITY,
-      "code",
-      "Code already exists."
-    );
-  }
+ 
   const result = await SubCategory.create(payload);
   return result;
 };
 const getAllSubCategoriesDB = async (query: Record<string, unknown>) => {
-  const searchableFields = ["name", "code"];
+  const searchableFields = ["name", ];
   const mainQuery = new QueryBuilder(
     SubCategory.find({}).populate("category"),
     query
@@ -38,7 +32,7 @@ const getAllSubCategoriesDB = async (query: Record<string, unknown>) => {
   return result;
 };
 const getSingleSubCategoryDB = async (subCategoryId: string) => {
-  const result = await SubCategory.findById(subCategoryId);
+  const result = await SubCategory.findById(subCategoryId).populate("category");
   return result;
 };
 const updateSubCategoryIntoDB = async (
@@ -54,10 +48,22 @@ const updateSubCategoryStatusDB = async (
   subCategoryId: string,
   isActive: boolean
 ) => {
-console.log(subCategoryId)
+
   const result = await SubCategory.findByIdAndUpdate(
     subCategoryId,
     { isActive: isActive },
+    { new: true }
+  );
+  return result;
+};
+const updateSubCategoryApprovedStatusDB = async (subCategoryId: string) => {
+  const isCategoryExists=await SubCategory.findById(subCategoryId)
+  if (!isCategoryExists) {
+    throw new AppError(httpStatus.NOT_FOUND,"subCategoryError","Sub Category does not exist.")
+  }
+  const result = await SubCategory.findByIdAndUpdate(
+    subCategoryId,
+    { isApproved: true,isActive:true },
     { new: true }
   );
   return result;
@@ -72,5 +78,6 @@ export const SubCatServices = {
   getSingleSubCategoryDB,
   updateSubCategoryIntoDB,
   updateSubCategoryStatusDB,
+  updateSubCategoryApprovedStatusDB,
   getAllActiveSubCategoriesDB,
 };

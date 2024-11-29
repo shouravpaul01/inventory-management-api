@@ -8,7 +8,7 @@ const createSubCategoryInto = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Added successfully",
+    message: "Sub Category created successfully.",
     data: result,
   });
 });
@@ -40,7 +40,7 @@ const updateSubCategoryInto = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Updated successfully.",
+    message: "Sub Category updated successfully.",
     data: result,
   });
 });
@@ -55,9 +55,20 @@ const updateSubCategoryStatus = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: `${
-      result?.isActive ? "Successfully Deactivated." : "Successfully Activated."
-    }`,
+    message: `${result?.isActive?"Category inactivation was successful.":"Category activation was successful."}`,
+    data: result,
+  });
+});
+const updateSubCategoryApprovedStatus = catchAsync(async (req, res) => {
+  const { subCategoryId } = req.params;
+
+  const result = await SubCatServices.updateSubCategoryApprovedStatusDB(
+    subCategoryId
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Sub Category approval successful.",
     data: result,
   });
 });
@@ -76,5 +87,6 @@ export const SubCatControllers = {
   getSingleSubCategory,
   updateSubCategoryInto,
   updateSubCategoryStatus,
+  updateSubCategoryApprovedStatus,
   getAllActiveSubCategories,
 };

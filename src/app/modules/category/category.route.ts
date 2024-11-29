@@ -1,20 +1,21 @@
 import express from "express";
 import { validateRequest } from "../../middlewares/validateRequest";
-import { CategoryValidations } from "./category.validation";
+
 import { CategoryControllers } from "./category.controller";
+import { categoryValidationSchema } from "./category.validation";
 
 
 const router = express.Router();
 
 router.post(
   "/create-category",
-  validateRequest(CategoryValidations.createCategoryValidationSchema),
+  validateRequest(categoryValidationSchema),
   CategoryControllers.createCategoryInto
 );
 router.get('/',CategoryControllers.getAllCategories)
 router.get('/single-category/:categoryId',CategoryControllers.getSingleCategory)
-router.patch('/:categoryId',validateRequest(CategoryValidations.updateCategoryValidationSchema),CategoryControllers.updateCategoryInto)
+router.patch('/update-category/:categoryId',validateRequest(categoryValidationSchema),CategoryControllers.updateCategoryInto)
 router.patch('/update-active-status/:categoryId',CategoryControllers.updateCategoryStatus)
-router.get('/all-active',CategoryControllers.getAllActiveCategories)
+router.patch('/update-approved-status/:categoryId',CategoryControllers.updateCategoryApprovedStatus)
 
 export const CategoryRoutes=router
