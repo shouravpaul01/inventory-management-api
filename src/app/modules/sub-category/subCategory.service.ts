@@ -18,11 +18,12 @@ const createSubCategoryIntoDB = async (payload: TSubCategory) => {
   return result;
 };
 const getAllSubCategoriesDB = async (query: Record<string, unknown>) => {
+ 
   const searchableFields = ["name", ];
   const mainQuery = new QueryBuilder(
     SubCategory.find({}).populate("category"),
     query
-  ).search(searchableFields);
+  ).filter().search(searchableFields);
 
   const totalPages = (await mainQuery.totalPages()).totalQuery;
   const subCategoryQuery = mainQuery.paginate();
@@ -68,8 +69,8 @@ const updateSubCategoryApprovedStatusDB = async (subCategoryId: string) => {
   );
   return result;
 };
-const getAllActiveSubCategoriesDB = async () => {
-  const result = await SubCategory.find({ isActive: true });
+const getAllActiveSubCategoriesByCategoryDB = async (categoryId:string) => {
+  const result = await SubCategory.find({category:categoryId, isActive: true,isApproved:true });
   return result;
 };
 export const SubCatServices = {
@@ -79,5 +80,5 @@ export const SubCatServices = {
   updateSubCategoryIntoDB,
   updateSubCategoryStatusDB,
   updateSubCategoryApprovedStatusDB,
-  getAllActiveSubCategoriesDB,
+  getAllActiveSubCategoriesByCategoryDB,
 };

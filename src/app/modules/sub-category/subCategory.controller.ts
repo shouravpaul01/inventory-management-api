@@ -72,8 +72,10 @@ const updateSubCategoryApprovedStatus = catchAsync(async (req, res) => {
     data: result,
   });
 });
-const getAllActiveSubCategories = catchAsync(async (req, res) => {
-  const result = await SubCatServices.getAllActiveSubCategoriesDB();
+const getAllActiveSubCategoriesByCategory = catchAsync(async (req, res) => {
+  const {categoryId}=req.params
+  console.log(categoryId,"dd")
+  const result = await SubCatServices.getAllActiveSubCategoriesByCategoryDB(categoryId);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -88,5 +90,5 @@ export const SubCatControllers = {
   updateSubCategoryInto,
   updateSubCategoryStatus,
   updateSubCategoryApprovedStatus,
-  getAllActiveSubCategories,
+  getAllActiveSubCategoriesByCategory,
 };

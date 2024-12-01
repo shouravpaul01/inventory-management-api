@@ -17,6 +17,6 @@ router.get('/single-sub-category/:subCategoryId',SubCatControllers.getSingleSubC
 router.patch('/update-sub-category/:subCategoryId',validateRequest(SubCatValidationSchema),SubCatControllers.updateSubCategoryInto)
 router.patch('/update-active-status/:subCategoryId',SubCatControllers.updateSubCategoryStatus)
 router.patch('/update-approved-status/:subCategoryId',SubCatControllers.updateSubCategoryApprovedStatus)
-router.get('/all-active',SubCatControllers.getAllSubCategories)
+router.get('/all-active-sub-categories/:categoryId',SubCatControllers.getAllActiveSubCategoriesByCategory)
 
 export const SubCatRoutes=router
