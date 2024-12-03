@@ -21,7 +21,7 @@ export const generateAccessoryCodeTitle = async (
   }
   const codeFormet = `CSE-${isSubCatExists?.name
     .substring(0, 4)
-    .toUpperCase()}-${codeTitle.toUpperCase}`;
+    .toUpperCase()}-${codeTitle.toUpperCase()}`;
   const isCodeTitleExists = await Accessory.findOne({ codeTitle: codeFormet });
   if (isCodeTitleExists) {
     throw new AppError(
@@ -33,12 +33,14 @@ export const generateAccessoryCodeTitle = async (
   return codeFormet;
 };
 export const generateAccessoriesCode = async (
-    quantity: number,
-    codeTitle: string
+  {totalQuantity,quantity,
+  codeTitle}:{totalQuantity?:number,quantity: number,
+    codeTitle: string}
   ) => {
     const allCodes= [];
-  for (let i = 1; i <= quantity; i++) {
-    const code = `${codeTitle}-${String(i).padStart(3, '0')}`;
+    const quantityLength=totalQuantity?totalQuantity+quantity: quantity
+  for (let i = totalQuantity?totalQuantity+1:1; i <=quantityLength ; i++) {
+    const code = `${codeTitle}-${String(i).padStart(4, '0')}`;
     allCodes.push(code);
   }
 
