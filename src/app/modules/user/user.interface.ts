@@ -1,5 +1,6 @@
 import { Model, Types } from "mongoose";
 import { TFaculty } from "../faculty/faculty.interface";
+import { USER_ROLE } from "./user.constent";
 
 export type TUser = {
   userId: string;
@@ -14,10 +15,7 @@ export type TUser = {
   isBlocked: boolean;
   isDeleted: boolean;
 };
-export type TUserRole = {
-  Admin: string;
-  Faculty: string;
-};
+export type TUserRole = keyof typeof USER_ROLE;
 
 export interface UserModel extends Model<TUser> {
   isUserExists(userId: string): Promise<TUser | null>;

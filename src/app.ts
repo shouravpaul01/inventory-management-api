@@ -7,6 +7,7 @@ import { CategoryRoutes } from './app/modules/category/category.route'
 import { SubCatRoutes } from './app/modules/sub-category/subCategory.route'
 import { AuthRoutes } from './app/modules/auth/auth.route'
 import { AccessoryRouters } from './app/modules/accessories/accessories.route'
+import { StockRoutes } from './app/modules/stock/stock.route'
 const app = express()
 
 app.use(express.json())
@@ -19,6 +20,7 @@ app.use("/api/v1/auth",AuthRoutes)
 app.use("/api/v1/categories",CategoryRoutes)
 app.use("/api/v1/sub-categories",SubCatRoutes)
 app.use("/api/v1/accessories",AccessoryRouters)
+app.use("/api/v1/stocks",StockRoutes)
 app.get('/', (req, res) => {
   res.send('Hello World!')
 })

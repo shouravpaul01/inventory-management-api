@@ -13,17 +13,21 @@ export type TAccessory = {
     };
     codeDetails:{
       codeTitle: string; 
-      totalCodes:string[];
-      currentCodes:string[];
+      totalCodes?:string[];
+      currentCodes?:string[];
       distributedCodes?:string[];
       orderCodes?:string[];
     },
     
     description?: string; 
     isItReturnable?: boolean; 
-    status?: 'Available' |  'Out of Stock';
+    status?: 'Available' | 'Low Stock' |  'Out of Stock';
     isActive:boolean;
-    isApproved:boolean;
+    approvalDetails:{
+      isApproved:boolean,
+      approvedBy:Types.ObjectId,
+      approvedDate:string
+  },
     isDeleted:boolean;
   };
   

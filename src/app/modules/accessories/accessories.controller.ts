@@ -83,7 +83,7 @@ const updateAccessoryStatus = catchAsync(async (req, res) => {
 const updateAccessoryApprovedStatus = catchAsync(async (req, res) => {
   const { accessoryId } = req.params;
 
-  const result = await AccessoryServices.updateAccessoryApprovedStatusDB(
+  const result = await AccessoryServices.updateAccessoryApprovedStatusDB(req.user,
     accessoryId
   );
   sendResponse(res, {

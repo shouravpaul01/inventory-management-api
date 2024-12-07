@@ -9,52 +9,87 @@ import {
 } from "./accessories.utils";
 import { QueryBuilder } from "../../builder/QueryBuilder";
 import { deleteFileFromCloudinary } from "../../utils/deleteFileFromCloudinary";
+import { Stock } from "../stock/stock.model";
+
+import mongoose from "mongoose";
+import { JwtPayload } from "jsonwebtoken";
 
 const createAccessoryIntoDB = async (
   file: TFileUpload,
   payload: TAccessory & { codeTitle: string; quantity: number }
 ) => {
-  const isAccessoryExists = await Accessory.findOne({ name: payload.name });
-  if (isAccessoryExists) {
+  console.log(payload);
+  const session = await mongoose.startSession();
+
+  try {
+    await session.startTransaction();
+
+    // Check if accessory already exists
+    const isAccessoryExists = await Accessory.findOne({
+      name: payload.name,
+    }).session(session);
+    if (isAccessoryExists) {
+      throw new AppError(
+        httpStatus.UNPROCESSABLE_ENTITY,
+        "name",
+        "Name already exists."
+      );
+    }
+
+    // Handle file upload (image)
+    if (file) {
+      payload.image = file.path;
+    }
+
+    // Generate code title and accessory codes
+    const codeTitle = await generateAccessoryCodeTitle(
+      payload.subCategory,
+      payload.codeTitle
+    );
+
+    const codes = await generateAccessoriesCode({
+      quantity: payload.quantity as number,
+      codeTitle: codeTitle,
+    });
+
+    if (!payload.codeDetails) {
+      payload.codeDetails = {
+        codeTitle: codeTitle,
+      };
+    }
+
+    // Create accessory
+    const isCreateAccessorySuccessResult = await Accessory.create([payload], {
+      session,
+    });
+
+    // Create stock document
+    const stockPayload = {
+      accessory: isCreateAccessorySuccessResult[0]._id,
+      quantity: payload.quantity,
+      accessoryCodes: codes,
+    };
+    const isCreateStockSuccessResult = await Stock.create([stockPayload], {
+      session,
+    });
+    console.log(isCreateStockSuccessResult, "isCreateStockSuccessResult");
+
+    await session.commitTransaction();
+
+    // Return the created accessory object
+    return isCreateAccessorySuccessResult[0];
+  } catch (error) {
+    console.log(error);
+    await session.abortTransaction();
+    await session.endSession();
     throw new AppError(
       httpStatus.UNPROCESSABLE_ENTITY,
-      "name",
-      "Name already exists."
+      "accessoryError",
+      "Accessory creation failed."
     );
   }
-  if (file) {
-    payload.image = file.path;
-  }
-  if (!payload.quantityDetails) {
-    payload.quantityDetails = {
-      totalQuantity: 0,
-      currentQuantity: 0,
-    };
-  }
-  const codeTitle = await generateAccessoryCodeTitle(
-    payload.subCategory,
-    payload.codeTitle
-  );
-  const codes = await generateAccessoriesCode({
-    quantity: payload.quantity as number,
-    codeTitle,
-  });
-  if (!payload.codeDetails) {
-    payload.codeDetails = {
-      codeTitle: codeTitle,
-      totalCodes: [],
-      currentCodes: [],
-    };
-  }
-
-  payload.quantityDetails.totalQuantity = payload.quantity;
-  payload.quantityDetails.currentQuantity = payload.quantity;
-  payload.codeDetails.totalCodes = codes;
-  payload.codeDetails.currentCodes = codes;
-
-  const result = await Accessory.create(payload);
-  return result;
 };
+
 const getAllAccessoriesDB = async (query: Record<string, unknown>) => {
   const searchableFields = ["name"];
   const mainQuery = new QueryBuilder(
@@ -72,7 +107,6 @@ const getAllAccessoriesDB = async (query: Record<string, unknown>) => {
   return result;
 };
 const getSingleAccessoryDB = async (accessoryId: string) => {
-
   const result = await Accessory.findById(accessoryId);
   return result;
 };
@@ -94,7 +128,7 @@ const updateAccessoryDB = async (
     await deleteFileFromCloudinary(isAccessoryExists.image!);
     payload.image = file.path;
   }
-  if (isAccessoryExists.isApproved) {
+  if (isAccessoryExists.approvalDetails.isApproved) {
     delete payload["codeTitle"];
     delete payload["quantity"];
   } else {
@@ -126,12 +160,11 @@ const updateAccessoryDB = async (
     payload.codeDetails.currentCodes = codes;
   }
 
- 
+  const result = await Accessory.findByIdAndUpdate(accessoryId, payload, {
+    new: true,
+  });
 
-  const result = await Accessory.findByIdAndUpdate(accessoryId, payload,
-  { new: true });
-
-  return result
+  return result;
 };
 const updateStockQuantityDB = async (
   accessoryId: string,
@@ -187,22 +220,74 @@ const updateAccessoryStatusDB = async (
   );
   return result;
 };
-const updateAccessoryApprovedStatusDB = async (accessoryId: string) => {
-  const isAccessoryExists = await Accessory.findById(accessoryId);
-  if (!isAccessoryExists) {
+
+
+const updateAccessoryApprovedStatusDB = async (
+  user: JwtPayload,
+  accessoryId: string
+) => {
+  const session = await mongoose.startSession(); // Start session
+
+  try {
+    session.startTransaction(); 
+
+    // Check if accessory exists
+    const isAccessoryExists = await Accessory.findById(accessoryId).session(session);
+    if (!isAccessoryExists) {
+      throw new AppError(
+        httpStatus.NOT_FOUND,
+        "accessoryError",
+        "Accessory doesn't exist."
+      );
+    }
+
+    // Update Stock approval details
+   const stockUpdateResult= await Stock.findOneAndUpdate(
+      { accessory: accessoryId },
+      {
+        "approvalDetails.isApproved": true,
+        "approvalDetails.approvedBy": user._id,
+        "approvalDetails.approvedDate": new Date(),
+      },
+      { new: true, session } 
+    );
+
+    // Update Accessory approval details
+    const result = await Accessory.findByIdAndUpdate(
+      accessoryId,
+      {
+        "quantityDetails.totalQuantity":stockUpdateResult?.quantity,
+        "quantityDetails.currentQuantity":stockUpdateResult?.quantity,
+        $push:{
+          "codeDetails.totalCodes":stockUpdateResult?.accessoryCodes,
+          "codeDetails.currentCodes":stockUpdateResult?.accessoryCodes
+        },
+        "approvalDetails.isApproved": true,
+        "approvalDetails.approvedBy": user._id,
+        "approvalDetails.approvedDate": new Date(),
+        isActive: true,
+      },
+      { new: true, session } 
+    );
+
+  
+    await session.commitTransaction();
+
+    return result; // Return the updated accessory
+  } catch (error) {
+ 
+    await session.abortTransaction();
     throw new AppError(
       httpStatus.NOT_FOUND,
       "accessoryError",
-      "Accessory doesn't exist."
+      "Accessory approval failed."
     );
+  } finally {
+    // End the session
+    session.endSession();
   }
-  const result = await Accessory.findByIdAndUpdate(
-    accessoryId,
-    { isApproved: true, isActive: true },
-    { new: true }
-  );
-  return result;
 };
+
 export const AccessoryServices = {
   createAccessoryIntoDB,
   getAllAccessoriesDB,
