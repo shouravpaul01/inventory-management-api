@@ -6,7 +6,7 @@ import { Types } from "mongoose";
 import { Accessory } from "./accessories.modal";
 
 export const generateAccessoryCodeTitle = async (
-  subCategoryId: Types.ObjectId,
+  subCategoryId: Types.ObjectId | string,
   codeTitle: string
 ) => {
   const isSubCatExists = await SubCategory.findById(subCategoryId).populate(

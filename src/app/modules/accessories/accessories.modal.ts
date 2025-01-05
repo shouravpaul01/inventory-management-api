@@ -10,26 +10,20 @@ const accessorySchema = new Schema<TAccessory>({
     required: true,
   },
   image: { type: String },
-  quantityDetails: {
-    totalQuantity: { type: Number, default:0 },
-    currentQuantity: { type: Number, default: 0 },
-    distributedQuantity: { type: Number, default: 0 },
-    orderQuantity: { type: Number, default: 0 },
-  },
-  codeDetails: {
-    codeTitle: { type: String,  unique: true },
-    totalCodes: { type: [String],default: [] },
-    currentCodes: { type: [String] ,default: []},
-    distributedCodes: { type: [String], default: [] },
-    orderCodes: { type: [String], default: [] },
-  },
+
+  codeTitle: { type: String, unique: true },
 
   description: { type: String },
   isItReturnable: { type: Boolean, default: true },
+  stock: {
+    type: Schema.Types.ObjectId,
+    ref: "Stock",
+    required: true,
+  },
   status: {
     type: String,
-    enum: ["Available","Low Stock", "Out of Stock"],
-    default:"Available"
+    enum: ["Available", "Low Stock", "Out of Stock"],
+    default: "Available",
   },
   isActive: { type: Boolean, default: false },
   approvalDetails: {
@@ -41,9 +35,9 @@ const accessorySchema = new Schema<TAccessory>({
       type: Schema.Types.ObjectId,
       ref: "User",
     },
-    approvedDate:{
-      type:Date
-    }
+    approvedDate: {
+      type: Date,
+    },
   },
   isDeleted: { type: Boolean, default: false },
 });

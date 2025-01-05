@@ -1,34 +1,47 @@
-import { model, Schema } from "mongoose"
-import { TStock } from "./stock.interface"
+import { model, Schema } from "mongoose";
+import { TStock } from "./stock.interface";
 
-const stockSchema=new Schema<TStock>({
-    accessory:{
-        type:Schema.Types.ObjectId,
-        ref:"Accessory",
-        required:true
+const stockSchema = new Schema<TStock>(
+  {
+    quantityDetails: {
+      totalQuantity: { type: Number, default: 0 },
+      currentQuantity: { type: Number, default: 0 },
+      distributedQuantity: { type: Number, default: 0 },
+      orderQuantity: { type: Number, default: 0 },
     },
-    quantity:{
-        type:Number,
-        required:true
+    codeDetails: {
+      totalCodes: { type: [String], default: [] },
+      currentCodes: { type: [String], default: [] },
+      distributedCodes: { type: [String], default: [] },
+      orderCodes: { type: [String], default: [] },
     },
-    accessoryCodes:{ type: [String], default: [] },
-    approvalDetails:{
-        isApproved:{
-            type:Boolean,
-            default:false
+    details: [
+      {
+        quantity: { type: Number },
+        accessoryCodes: { type: [String], default: [] },
+        date:{type:Date,default:new Date()},
+        isActive: { type: Boolean, default: false },
+        isDeleted: { type: Boolean, default: false },
+        approvalDetails: {
+          isApproved: {
+            type: Boolean,
+            default: false,
+          },
+          approvedBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+          },
+          approvedDate: { type: Date },
         },
-        approvedBy:{
-            type:Schema.Types.ObjectId,
-            ref:"User",
-        }
-        ,
-        approvedDate: { type: Date },
-    },
-    description:{
-        type:String
-    }
-},{
-    timestamps:true
-})
+        description: {
+          type: String,
+        },
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  }
+);
 
-export const Stock= model<TStock>("Stock",stockSchema)
+export const Stock = model<TStock>("Stock", stockSchema);

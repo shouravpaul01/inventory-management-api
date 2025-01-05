@@ -42,34 +42,17 @@ const createAccessoryIntoDB = async (
     }
 
     // Generate code title and accessory codes
-    const codeTitle = await generateAccessoryCodeTitle(
+    const generateCode = await generateAccessoryCodeTitle(
       payload.subCategory,
       payload.codeTitle
     );
-
-    const codes = await generateAccessoriesCode({
-      quantity: payload.quantity as number,
-      codeTitle: codeTitle,
-    });
-
-    if (!payload.codeDetails) {
-      payload.codeDetails = {
-        codeTitle: codeTitle,
-      };
-    }
-
+    payload.codeTitle = generateCode;
+   
+    const isCreateStockSuccessResult = new Stock();
+    await isCreateStockSuccessResult.save({ session }); 
+    payload.stock = isCreateStockSuccessResult._id;
     // Create accessory
     const isCreateAccessorySuccessResult = await Accessory.create([payload], {
-      session,
-    });
-
-    // Create stock document
-    const stockPayload = {
-      accessory: isCreateAccessorySuccessResult[0]._id,
-      quantity: payload.quantity,
-      accessoryCodes: codes,
-    };
-    const isCreateStockSuccessResult = await Stock.create([stockPayload], {
       session,
     });
     console.log(isCreateStockSuccessResult, "isCreateStockSuccessResult");
@@ -93,7 +76,7 @@ const createAccessoryIntoDB = async (
 const getAllAccessoriesDB = async (query: Record<string, unknown>) => {
   const searchableFields = ["name"];
   const mainQuery = new QueryBuilder(
-    Accessory.find({}).populate("category").populate("subCategory"),
+    Accessory.find({}).populate("category").populate("subCategory").populate("stock"),
     query
   )
     .filter()
@@ -221,7 +204,6 @@ const updateAccessoryStatusDB = async (
   return result;
 };
 
-
 const updateAccessoryApprovedStatusDB = async (
   user: JwtPayload,
   accessoryId: string
@@ -229,10 +211,12 @@ const updateAccessoryApprovedStatusDB = async (
   const session = await mongoose.startSession(); // Start session
 
   try {
-    session.startTransaction(); 
+    session.startTransaction();
 
     // Check if accessory exists
-    const isAccessoryExists = await Accessory.findById(accessoryId).session(session);
+    const isAccessoryExists = await Accessory.findById(accessoryId).session(
+      session
+    );
     if (!isAccessoryExists) {
       throw new AppError(
         httpStatus.NOT_FOUND,
@@ -242,40 +226,38 @@ const updateAccessoryApprovedStatusDB = async (
     }
 
     // Update Stock approval details
-   const stockUpdateResult= await Stock.findOneAndUpdate(
+    const stockUpdateResult = await Stock.findOneAndUpdate(
       { accessory: accessoryId },
       {
         "approvalDetails.isApproved": true,
         "approvalDetails.approvedBy": user._id,
         "approvalDetails.approvedDate": new Date(),
       },
-      { new: true, session } 
+      { new: true, session }
     );
 
     // Update Accessory approval details
     const result = await Accessory.findByIdAndUpdate(
       accessoryId,
       {
-        "quantityDetails.totalQuantity":stockUpdateResult?.quantity,
-        "quantityDetails.currentQuantity":stockUpdateResult?.quantity,
-        $push:{
-          "codeDetails.totalCodes":stockUpdateResult?.accessoryCodes,
-          "codeDetails.currentCodes":stockUpdateResult?.accessoryCodes
+        "quantityDetails.totalQuantity": stockUpdateResult?.quantity,
+        "quantityDetails.currentQuantity": stockUpdateResult?.quantity,
+        $push: {
+          "codeDetails.totalCodes": stockUpdateResult?.accessoryCodes,
+          "codeDetails.currentCodes": stockUpdateResult?.accessoryCodes,
         },
         "approvalDetails.isApproved": true,
         "approvalDetails.approvedBy": user._id,
         "approvalDetails.approvedDate": new Date(),
         isActive: true,
       },
-      { new: true, session } 
+      { new: true, session }
     );
 
-  
     await session.commitTransaction();
 
     return result; // Return the updated accessory
   } catch (error) {
- 
     await session.abortTransaction();
     throw new AppError(
       httpStatus.NOT_FOUND,

@@ -1,33 +1,25 @@
 import { Types } from "mongoose";
 
+export type TApprovalDetails = {
+  isApproved: boolean;
+  approvedBy?: Types.ObjectId | string; 
+  approvedDate?: Date;
+};
+
 export type TAccessory = {
-    name: string; 
-    category: Types.ObjectId; 
-    subCategory: Types.ObjectId;  
-    image?: string; 
-    quantityDetails: {
-      totalQuantity: number; 
-      currentQuantity: number; 
-      distributedQuantity?: number; 
-      orderQuantity?: number; 
-    };
-    codeDetails:{
-      codeTitle: string; 
-      totalCodes?:string[];
-      currentCodes?:string[];
-      distributedCodes?:string[];
-      orderCodes?:string[];
-    },
-    
-    description?: string; 
-    isItReturnable?: boolean; 
-    status?: 'Available' | 'Low Stock' |  'Out of Stock';
-    isActive:boolean;
-    approvalDetails:{
-      isApproved:boolean,
-      approvedBy:Types.ObjectId,
-      approvedDate:string
-  },
-    isDeleted:boolean;
-  };
-  
+  _id?: Types.ObjectId | string;
+  name: string;
+  category: Types.ObjectId | string; 
+  subCategory: Types.ObjectId | string;
+  image?: string;
+  codeTitle: string;
+  description?: string;
+  isItReturnable: boolean;
+  stock: Types.ObjectId | string; 
+  status: "Available" | "Low Stock" | "Out of Stock";
+  isActive: boolean;
+  approvalDetails: TApprovalDetails;
+  isDeleted: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
