@@ -19,7 +19,10 @@ const stockSchema = new Schema<TStock>(
       {
         quantity: { type: Number },
         accessoryCodes: { type: [String], default: [] },
-        date:{type:Date,default:new Date()},
+        images:{type:[String]},
+        description: {
+          type: String,
+        },
         isActive: { type: Boolean, default: false },
         isDeleted: { type: Boolean, default: false },
         approvalDetails: {
@@ -33,15 +36,14 @@ const stockSchema = new Schema<TStock>(
           },
           approvedDate: { type: Date },
         },
-        description: {
-          type: String,
-        },
+        
+
+       
       },
+      { timestamps: true}
     ],
-  },
-  {
-    timestamps: true,
   }
+  
 );
 
 export const Stock = model<TStock>("Stock", stockSchema);

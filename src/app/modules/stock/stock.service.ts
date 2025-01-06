@@ -9,10 +9,12 @@ import { generateAccessoriesCode } from "../accessories/accessories.utils";
 const createStockDB = async (
   stockId: string,
   files: any,
-  payload: { quantity: number; images: string[]; description: string }
+  payload:Partial<TStock> & { quantity: number; images: string[]; description: string ,accessoryCodes:string[] }
 ) => {
+  console.log(stockId,files,payload,'helllo')
   const isExistsStock = await Stock.findById(stockId);
-  const isExistsAccessory = await Accessory.findById(stockId);
+  console.log(isExistsStock,"isStock")
+  const isExistsAccessory = await Accessory.findOne({stock:stockId});
   if (!isExistsStock) {
     throw new AppError(
       httpStatus.NOT_FOUND,
@@ -28,6 +30,8 @@ const createStockDB = async (
     quantity: payload.quantity,
     codeTitle: isExistsAccessory?.codeTitle as string,
   });
+  payload.accessoryCodes=codes
+  console.log(codes,"codes")
   const stockData = {
     quantityDetails: {
       totalQuantity:
@@ -35,13 +39,13 @@ const createStockDB = async (
       currentQuantity:
         isExistsStock.quantityDetails.currentQuantity + payload.quantity,
     },
-    $push: {
-      codeDetails: {
-        totalCodes: codes,
-        currentCodes: codes,
-      },
-      details: payload,
-    },
+    
+      $push: {"codeDetails.totalCodes": codes,"codeDetails.currentCodes": codes, details: payload,},
+    
+
+      
+     
+    
   };
   const result = await Stock.findByIdAndUpdate(
     stockId,
@@ -51,10 +55,10 @@ const createStockDB = async (
   return result;
 };
 const getAllStocksDB = async (query: Record<string, unknown>) => {
-  console.log(query, "query");
+  // console.log(query, "query");
   const stocks = await Stock.findById(query._id);
 
-  console.log(stocks);
+  // console.log(stocks);
   return stocks;
 };
 

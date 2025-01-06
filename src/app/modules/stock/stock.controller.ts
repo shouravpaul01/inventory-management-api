@@ -5,6 +5,7 @@ import { StockService } from "./stock.service";
 
 const createStock = catchAsync(async (req, res) => {
  const {stockId}=req.params
+ console.log(req,'req')
   const result = await StockService.createStockDB(stockId,(req as any).files ,req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
