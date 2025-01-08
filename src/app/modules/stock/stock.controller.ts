@@ -5,7 +5,7 @@ import { StockService } from "./stock.service";
 
 const createStock = catchAsync(async (req, res) => {
  const {stockId}=req.params
- console.log(req,'req')
+ 
   const result = await StockService.createStockDB(stockId,(req as any).files ,req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -24,8 +24,19 @@ const getAllStocks = catchAsync(async (req, res) => {
       data: result,
     });
   });
-
+  const updateStockApprovedStatus = catchAsync(async (req, res) => {
+    const {stockId,stockDetailsId}=req.query
+    
+     const result = await StockService.updateStockApprovedStatusDB(req.user,stockId as string,stockDetailsId as string);
+     sendResponse(res, {
+       statusCode: httpStatus.OK,
+       success: true,
+       message: "Stock approval successful.",
+       data: result,
+     });
+   });
   export const StockController={
     createStock,
-    getAllStocks
+    getAllStocks,
+    updateStockApprovedStatus
   }
