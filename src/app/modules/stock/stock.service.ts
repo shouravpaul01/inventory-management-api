@@ -1,11 +1,12 @@
 import httpStatus from "http-status";
 import { QueryBuilder } from "../../builder/QueryBuilder";
 import AppError from "../../errors/AppError";
-import { TStock } from "./stock.interface";
+import { TStock, TStockDetail } from "./stock.interface";
 import { Stock } from "./stock.model";
 import { Accessory } from "../accessories/accessories.modal";
 import { generateAccessoriesCode } from "../accessories/accessories.utils";
 import { JwtPayload } from "jsonwebtoken";
+import { deleteFileFromCloudinary } from "../../utils/deleteFileFromCloudinary";
 
 const createStockDB = async (
   stockId: string,
@@ -30,12 +31,7 @@ const createStockDB = async (
   if (Array.isArray(files) && files.length > 0) {
     payload.images = files.map((file) => file.path);
   }
-  // const codes = await generateAccessoriesCode({
-  //   totalQuantity: isExistsStock.quantityDetails.totalQuantity,
-  //   quantity: payload.quantity,
-  //   codeTitle: isExistsAccessory?.codeTitle as string,
-  // });
-  // payload.accessoryCodes=codes
+  
 
   const result = await Stock.findByIdAndUpdate(
     stockId,
@@ -56,7 +52,7 @@ const updateStockApprovedStatusDB = async (
   stockId: string,
   stockDetailsId: string
 ) => {
-  console.log(stockId, stockDetailsId);
+
   // Check if Stock exists
   const isStockExists = await Stock.findOne(
     { _id: stockId, "details._id": stockDetailsId },
@@ -69,7 +65,7 @@ const updateStockApprovedStatusDB = async (
   if (!isStockExists) {
     throw new AppError(
       httpStatus.NOT_FOUND,
-      "accessoryError",
+      "stockError",
       "Stock doesn't exist."
     );
   }
@@ -112,8 +108,63 @@ const updateStockApprovedStatusDB = async (
   );
   return result;
 };
+const getSingleStockDB=async(stockId: string,
+  stockDetailsId: string)=>{
+    const isStockExists = await Stock.findOne(
+      { _id: stockId, "details._id": stockDetailsId },
+      {
+        "details.$": 1
+      }
+    );
+    if (!isStockExists) {
+      throw new AppError(
+        httpStatus.NOT_FOUND,
+        "stockError",
+        "Stock doesn't exist."
+      );
+    }
+    return isStockExists.details[0]
+}
+const updateStockDB=async(stockId: string,
+  stockDetailsId: string,files:any,payload:Partial<TStockDetail>)=>{
+    const isStockExists = await Stock.findOne(
+      { _id: stockId, "details._id": stockDetailsId },
+      {
+        "details.$": 1
+      }
+    );
+    if (!isStockExists) {
+      throw new AppError(
+        httpStatus.NOT_FOUND,
+        "stockError",
+        "Stock doesn't exist."
+      );
+    }
+    if (Array.isArray(files) && files.length > 0) {
+      if (isStockExists?.details[0]?.images.length>0) {
+        
+        isStockExists?.details[0]?.images?.forEach(async(image)=> await deleteFileFromCloudinary(image))
+      }
+      payload.images = files.map((file) => file.path);
+    }
+    const result = await Stock.findOneAndUpdate(
+      { _id: stockId, "details._id": stockDetailsId },
+    {  $set: {
+        
+        "details.$.quantity": payload.quantity,
+        "details.$.images": payload.images,
+        "details.$.description": payload.description,
+        
+      }},
+      { new: true }
+    );
+    return result;
+    
+}
 export const StockService = {
   createStockDB,
   getAllStocksDB,
   updateStockApprovedStatusDB,
+  getSingleStockDB,
+  updateStockDB
 };

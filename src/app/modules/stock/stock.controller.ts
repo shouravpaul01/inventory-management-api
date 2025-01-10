@@ -35,8 +35,32 @@ const getAllStocks = catchAsync(async (req, res) => {
        data: result,
      });
    });
+   const getSingleStock = catchAsync(async (req, res) => {
+    const {stockId,stockDetailsId}=req.query
+    
+     const result = await StockService.getSingleStockDB(stockId as string,stockDetailsId as string);
+     sendResponse(res, {
+       statusCode: httpStatus.OK,
+       success: true,
+       message:  "Successfully retrieved the Stock.",
+       data: result,
+     });
+   });
+   const updateStock = catchAsync(async (req, res) => {
+    const {stockId,stockDetailsId}=req.query
+    
+     const result = await StockService.updateStockDB(stockId as string,stockDetailsId as string,(req as any).files,req.body);
+     sendResponse(res, {
+       statusCode: httpStatus.OK,
+       success: true,
+       message:   "Stock updated successfully.",
+       data: result,
+     });
+   });
   export const StockController={
     createStock,
     getAllStocks,
-    updateStockApprovedStatus
+    updateStockApprovedStatus,
+    getSingleStock,
+    updateStock
   }

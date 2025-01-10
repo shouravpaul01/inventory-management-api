@@ -12,7 +12,7 @@ export type TStockDetail = {
   _id?: Types.ObjectId | string;
   quantity: number;
   accessoryCodes: string[];
-  date:string,
+  images:string[],
   isActive:boolean,
   isDeleted:boolean,
   approvalDetails: TApprovalDetails;
