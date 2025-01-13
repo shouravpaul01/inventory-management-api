@@ -7,6 +7,7 @@ import { Accessory } from "../accessories/accessories.modal";
 import { generateAccessoriesCode } from "../accessories/accessories.utils";
 import { JwtPayload } from "jsonwebtoken";
 import { deleteFileFromCloudinary } from "../../utils/deleteFileFromCloudinary";
+import { Types } from "mongoose";
 
 const createStockDB = async (
   stockId: string,
@@ -40,13 +41,59 @@ const createStockDB = async (
   );
   return result;
 };
-const getAllStocksDB = async (query: Record<string, unknown>) => {
-  // console.log(query, "query");
-  const stocks = await Stock.findById(query._id);
 
-  // console.log(stocks);
-  return stocks;
+const getAllStocksDB = async (query: Record<string, unknown>) => {
+  
+
+  console.log(query,"query")
+  const detailConditions: any[] = [];
+
+  // Add approvalStatus condition if provided
+  if (query?.approvalStatus !== undefined) {
+    detailConditions.push({
+      $eq: ["$$detail.approvalDetails.isApproved", Boolean(query?.approvalStatus)],
+    });
+  }
+
+  // Add dateRange conditions if provided
+  if (query?.startDate) {
+    detailConditions.push({
+      $gte: ["$$detail.createdAt", new Date(query?.startDate as string)],
+    });
+  }
+  if (query?.endDate) {
+    detailConditions.push({
+      $lte: ["$$detail.createdAt", new Date(query?.endDate as string)],
+    });
+  }
+
+ 
+  const pipeline = [
+    { $match: { _id: new Types.ObjectId(query._id as string) } }, 
+    {
+      $project: {
+        _id: 1,
+        quantityDetails: 1,
+        codeDetails: 1,
+        details: {
+          $filter: {
+            input: "$details", 
+            as: "detail", 
+            cond: detailConditions.length > 0 
+            ? { $and: detailConditions } 
+            : { $literal: true }
+          }
+        }
+      }
+    }
+  ];
+
+  const stocks = await Stock.aggregate(pipeline);
+
+  console.log(stocks, "stocks");
+  return stocks[0];
 };
+
 const updateStockApprovedStatusDB = async (
   user: JwtPayload,
   stockId: string,

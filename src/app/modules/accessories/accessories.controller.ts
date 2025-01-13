@@ -36,7 +36,7 @@ const getSingleAccessory = catchAsync(async (req, res) => {
 });
 const updateAccessory = catchAsync(async (req, res) => {
   const { accessoryId } = req.params;
-
+console.log(req,"req")
   const result = await AccessoryServices.updateAccessoryDB(
     accessoryId,
     (req as any).file,
@@ -49,19 +49,7 @@ const updateAccessory = catchAsync(async (req, res) => {
     data: result,
   });
 });
-const updateStockQuantity = catchAsync(async (req, res) => {
-  const { accessoryId } = req.params;
-  const result = await AccessoryServices.updateStockQuantityDB(
-    accessoryId,
-    req.body
-  );
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Successfully updated the stock quantity.",
-    data: result,
-  });
-});
+
 const updateAccessoryStatus = catchAsync(async (req, res) => {
   const { accessoryId } = req.params;
   const { isActive } = req.query;
@@ -98,7 +86,7 @@ export const AccessoryControllers = {
   getAllAccessories,
   getSingleAccessory,
   updateAccessory,
-  updateStockQuantity,
+  
   updateAccessoryStatus,
   updateAccessoryApprovedStatus,
 };

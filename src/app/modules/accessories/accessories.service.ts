@@ -18,7 +18,6 @@ const createAccessoryIntoDB = async (
   file: TFileUpload,
   payload: TAccessory & { codeTitle: string; quantity: number }
 ) => {
-  console.log(payload);
   const session = await mongoose.startSession();
 
   try {
@@ -29,11 +28,7 @@ const createAccessoryIntoDB = async (
       name: payload.name,
     }).session(session);
     if (isAccessoryExists) {
-      throw new AppError(
-        httpStatus.UNPROCESSABLE_ENTITY,
-        "name",
-        "Name already exists."
-      );
+      throw new AppError(httpStatus.CONFLICT, "name", "Name already exists.");
     }
 
     // Handle file upload (image)
@@ -46,6 +41,17 @@ const createAccessoryIntoDB = async (
       payload.subCategory,
       payload.codeTitle
     );
+    const isCodeTitleExists = await Accessory.findOne({
+      codeTitle: generateCode,
+    }).session(session);
+
+    if (isCodeTitleExists) {
+      throw new AppError(
+        httpStatus.CONFLICT,
+        "codeTitle",
+        "Code title already exists."
+      );
+    }
     payload.codeTitle = generateCode;
 
     const isCreateStockSuccessResult = new Stock();
@@ -55,21 +61,26 @@ const createAccessoryIntoDB = async (
     const isCreateAccessorySuccessResult = await Accessory.create([payload], {
       session,
     });
-    console.log(isCreateStockSuccessResult, "isCreateStockSuccessResult");
 
     await session.commitTransaction();
 
     // Return the created accessory object
     return isCreateAccessorySuccessResult[0];
-  } catch (error) {
-    console.log(error);
+  } catch (error: any) {
+    console.log(error, "erore");
+
     await session.abortTransaction();
+    if (error instanceof AppError && error.isAppError) {
+      throw error;
+    } else {
+      throw new AppError(
+        httpStatus.UNPROCESSABLE_ENTITY,
+        "accessoryError",
+        "Accessory creation failed."
+      );
+    }
+  } finally {
     await session.endSession();
-    throw new AppError(
-      httpStatus.UNPROCESSABLE_ENTITY,
-      "accessoryError",
-      "Accessory creation failed."
-    );
   }
 };
 
@@ -99,7 +110,7 @@ const getSingleAccessoryDB = async (accessoryId: string) => {
 const updateAccessoryDB = async (
   accessoryId: string,
   file: TFileUpload,
-  payload: Partial<TAccessory> & { quantity?: number; codeTitle?: string }
+  payload: Partial<TAccessory>
 ) => {
   const isAccessoryExists = await Accessory.findById(accessoryId);
   if (!isAccessoryExists) {
@@ -109,42 +120,38 @@ const updateAccessoryDB = async (
       "Accessory doesn't exist."
     );
   }
+  console.log(payload, file,"update");
 
   if (file) {
-    await deleteFileFromCloudinary(isAccessoryExists.image!);
+    isAccessoryExists?.image && await deleteFileFromCloudinary(isAccessoryExists?.image!);
     payload.image = file.path;
   }
-  if (isAccessoryExists.approvalDetails.isApproved) {
-    delete payload["codeTitle"];
-    delete payload["quantity"];
-  } else {
-    const codeTitle = await generateAccessoryCodeTitle(
-      payload.subCategory!,
-      payload.codeTitle!
-    );
-    const codes = await generateAccessoriesCode({
-      quantity: payload.quantity as number,
-      codeTitle,
-    });
-    if (!payload.quantityDetails) {
-      payload.quantityDetails = {
-        totalQuantity: 0,
-        currentQuantity: 0,
-      };
+    // Generate a new code title if subCategory or codeTitle is provided
+    if (payload.subCategory || payload.codeTitle) {
+      const generateCode = await generateAccessoryCodeTitle(
+        payload.subCategory || isAccessoryExists.subCategory!,
+        payload.codeTitle || isAccessoryExists.codeTitle!
+      );
+  
+      // Check if the generated code title already exists in another accessory
+      const isCodeTitleExists = await Accessory.findOne({
+        codeTitle: generateCode,
+        _id: { $ne: accessoryId }, // Exclude the current accessory
+      });
+  console.log(isCodeTitleExists,"ss")
+      if (isCodeTitleExists) {
+        throw new AppError(
+          httpStatus.CONFLICT,
+          "codeTitle",
+          "Code title already exist."
+        );
+      }
+  
+      payload.codeTitle = generateCode; 
     }
-    if (!payload.codeDetails) {
-      payload.codeDetails = {
-        codeTitle: codeTitle,
-        totalCodes: [],
-        currentCodes: [],
-      };
-    }
+  
+  
 
-    payload.quantityDetails.totalQuantity = payload.quantity!;
-    payload.quantityDetails.currentQuantity = payload.quantity!;
-    payload.codeDetails.totalCodes = codes;
-    payload.codeDetails.currentCodes = codes;
-  }
 
   const result = await Accessory.findByIdAndUpdate(accessoryId, payload, {
     new: true,
@@ -152,41 +159,7 @@ const updateAccessoryDB = async (
 
   return result;
 };
-const updateStockQuantityDB = async (
-  accessoryId: string,
-  payload: { quantity: number }
-) => {
-  const isAccessoryExists = await Accessory.findById(accessoryId);
-  if (!isAccessoryExists) {
-    throw new AppError(
-      httpStatus.UNPROCESSABLE_ENTITY,
-      "accessoryError",
-      "Accessory doesn't exist."
-    );
-  }
-  const codes = await generateAccessoriesCode({
-    totalQuantity: isAccessoryExists.quantityDetails.totalQuantity,
-    quantity: payload.quantity as number,
-    codeTitle: isAccessoryExists.codeDetails.codeTitle,
-  });
 
-  const result = await Accessory.findByIdAndUpdate(
-    accessoryId,
-    {
-      $inc: {
-        "quantityDetails.totalQuantity": payload.quantity,
-        "quantityDetails.currentQuantity": payload.quantity,
-      },
-      $push: {
-        "codeDetails.totalCodes": { $each: codes },
-        "codeDetails.currentCodes": { $each: codes },
-      },
-    },
-    { new: true }
-  );
-
-  return result;
-};
 const updateAccessoryStatusDB = async (
   accessoryId: string,
   isActive: boolean
@@ -241,7 +214,6 @@ export const AccessoryServices = {
   getAllAccessoriesDB,
   getSingleAccessoryDB,
   updateAccessoryDB,
-  updateStockQuantityDB,
   updateAccessoryStatusDB,
   updateAccessoryApprovedStatusDB,
 };
