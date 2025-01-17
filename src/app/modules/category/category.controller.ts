@@ -35,7 +35,7 @@ const createCategoryInto = catchAsync(async (req, res) => {
   });
   const updateCategoryInto = catchAsync(async (req, res) => {
     const { categoryId } = req.params;
-    console.log(categoryId,req.body)
+   
     const result = await CategoryServices.updateCategoryIntoDB(categoryId, req.body);
     sendResponse(res, {
       statusCode: httpStatus.OK,
@@ -61,7 +61,7 @@ const createCategoryInto = catchAsync(async (req, res) => {
   const updateCategoryApprovedStatus = catchAsync(async (req, res) => {
     const { categoryId } = req.params;
  
-    const result = await CategoryServices.updateCategoryApprovedStatusDB(
+    const result = await CategoryServices.updateCategoryApprovedStatusDB(req.user,
       categoryId,
     );
     sendResponse(res, {

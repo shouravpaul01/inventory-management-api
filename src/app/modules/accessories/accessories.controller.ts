@@ -36,7 +36,7 @@ const getSingleAccessory = catchAsync(async (req, res) => {
 });
 const updateAccessory = catchAsync(async (req, res) => {
   const { accessoryId } = req.params;
-console.log(req,"req")
+
   const result = await AccessoryServices.updateAccessoryDB(
     accessoryId,
     (req as any).file,

@@ -3,6 +3,7 @@ import { TSubCategory } from "./subCategory.interface";
 import { SubCategory } from "./subCategory.model";
 import { QueryBuilder } from "../../builder/QueryBuilder";
 import AppError from "../../errors/AppError";
+import { JwtPayload } from "jsonwebtoken";
 
 
 const createSubCategoryIntoDB = async (payload: TSubCategory) => {
@@ -57,14 +58,19 @@ const updateSubCategoryStatusDB = async (
   );
   return result;
 };
-const updateSubCategoryApprovedStatusDB = async (subCategoryId: string) => {
+const updateSubCategoryApprovedStatusDB = async ( user: JwtPayload,subCategoryId: string) => {
   const isCategoryExists=await SubCategory.findById(subCategoryId)
   if (!isCategoryExists) {
     throw new AppError(httpStatus.NOT_FOUND,"subCategoryError","Sub Category does not exist.")
   }
   const result = await SubCategory.findByIdAndUpdate(
     subCategoryId,
-    { isApproved: true,isActive:true },
+    {
+      "approvalDetails.isApproved": true,
+      "approvalDetails.approvedBy": user._id,
+      "approvalDetails.approvedDate": new Date(),
+      isActive: true,
+    },
     { new: true }
   );
   return result;

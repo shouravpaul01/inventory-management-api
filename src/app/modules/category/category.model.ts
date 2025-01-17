@@ -17,10 +17,19 @@ const categorySchema = new Schema<TCategory, CategoryModel>(
       type: Boolean,
       default: false,
     },
-    isApproved:{
-      type:Boolean,
-      default:false
-    }
+    approvalDetails: {
+      isApproved: {
+        type: Boolean,
+        default: false,
+      },
+      approvedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      approvedDate: {
+        type: Date,
+      },
+    },
   },
   {
     timestamps: true,

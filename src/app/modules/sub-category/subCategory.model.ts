@@ -22,9 +22,18 @@ const categorySchema = new Schema<TSubCategory, SubCatModel>(
       type: Boolean,
       default: false,
     },
-    isApproved: {
-      type: Boolean,
-      default: false,
+    approvalDetails: {
+      isApproved: {
+        type: Boolean,
+        default: false,
+      },
+      approvedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      approvedDate: {
+        type: Date,
+      },
     },
   },
   {

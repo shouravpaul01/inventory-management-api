@@ -120,7 +120,6 @@ const updateAccessoryDB = async (
       "Accessory doesn't exist."
     );
   }
-  console.log(payload, file,"update");
 
   if (file) {
     isAccessoryExists?.image && await deleteFileFromCloudinary(isAccessoryExists?.image!);
@@ -128,30 +127,35 @@ const updateAccessoryDB = async (
   }
     // Generate a new code title if subCategory or codeTitle is provided
     if (payload.subCategory || payload.codeTitle) {
+      
       const generateCode = await generateAccessoryCodeTitle(
-        payload.subCategory || isAccessoryExists.subCategory!,
-        payload.codeTitle || isAccessoryExists.codeTitle!
+        payload.subCategory! ,
+        payload.codeTitle! 
       );
   
-      // Check if the generated code title already exists in another accessory
-      const isCodeTitleExists = await Accessory.findOne({
-        codeTitle: generateCode,
-        _id: { $ne: accessoryId }, // Exclude the current accessory
-      });
-  console.log(isCodeTitleExists,"ss")
-      if (isCodeTitleExists) {
-        throw new AppError(
-          httpStatus.CONFLICT,
-          "codeTitle",
-          "Code title already exist."
-        );
+      if (generateCode !== isAccessoryExists.codeTitle){
+    
+        // Check if the generated code title already exists in another accessory
+        const isCodeTitleExists = await Accessory.findOne({
+          codeTitle: generateCode,
+          _id: { $ne: accessoryId }, // Exclude the current accessory
+        });
+
+        if (isCodeTitleExists) {
+          throw new AppError(
+            httpStatus.CONFLICT,
+            "codeTitle",
+            "Code title already exist."
+          );
+        }
       }
+  
   
       payload.codeTitle = generateCode; 
     }
   
   
-
+    console.log("3")
 
   const result = await Accessory.findByIdAndUpdate(accessoryId, payload, {
     new: true,

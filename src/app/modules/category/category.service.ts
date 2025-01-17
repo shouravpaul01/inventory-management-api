@@ -3,6 +3,7 @@ import { Category } from "./category.model";
 import { TCategory } from "./category.interface";
 import { QueryBuilder } from "../../builder/QueryBuilder";
 import AppError from "../../errors/AppError";
+import { JwtPayload } from "jsonwebtoken";
 
 const createCategoryIntoDB = async (payload: TCategory) => {
   if (await Category.isCategoryNameExists(payload.name)) {
@@ -53,14 +54,19 @@ const updateCategoryStatusDB = async (categoryId: string, isActive: boolean) => 
   );
   return result;
 };
-const updateCategoryApprovedStatusDB = async (categoryId: string) => {
+const updateCategoryApprovedStatusDB = async ( user: JwtPayload,categoryId: string) => {
   const isCategoryExists=await Category.findById(categoryId)
   if (!isCategoryExists) {
     throw new AppError(httpStatus.NOT_FOUND,"categoryError","Category does not exist.")
   }
   const result = await Category.findByIdAndUpdate(
     categoryId,
-    { isApproved: true,isActive:true },
+    {  
+      "approvalDetails.isApproved": true,
+      "approvalDetails.approvedBy": user._id,
+      "approvalDetails.approvedDate": new Date(),
+      isActive: true,
+     },
     { new: true }
   );
   return result;

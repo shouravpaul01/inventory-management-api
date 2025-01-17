@@ -22,14 +22,7 @@ export const generateAccessoryCodeTitle = async (
   const codeFormet = `CSE-${isSubCatExists?.name
     .substring(0, 4)
     .toUpperCase()}-${codeTitle.toUpperCase()}`;
-  const isCodeTitleExists = await Accessory.findOne({ codeTitle: codeFormet });
-  if (isCodeTitleExists) {
-    throw new AppError(
-      httpStatus.NOT_FOUND,
-      "codeTitle",
-      "Code title already exists."
-    );
-  }
+
   return codeFormet;
 };
 export const generateAccessoriesCode = async (

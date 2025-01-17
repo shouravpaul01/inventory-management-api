@@ -1,10 +1,14 @@
-import { Model } from "mongoose";
-
+import { Model, Types } from "mongoose";
+export type TApprovalDetails = {
+  isApproved: boolean;
+  approvedBy?: Types.ObjectId | string; 
+  approvedDate?: Date;
+};
 export type TCategory = {
   name: string;
   description?: string;
   isActive: boolean;
-  isApproved: boolean;
+  approvalDetails: TApprovalDetails;
 };
 
 export interface CategoryModel extends Model<TCategory> {

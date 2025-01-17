@@ -62,7 +62,7 @@ const updateSubCategoryStatus = catchAsync(async (req, res) => {
 const updateSubCategoryApprovedStatus = catchAsync(async (req, res) => {
   const { subCategoryId } = req.params;
 
-  const result = await SubCatServices.updateSubCategoryApprovedStatusDB(
+  const result = await SubCatServices.updateSubCategoryApprovedStatusDB(req.user,
     subCategoryId
   );
   sendResponse(res, {
