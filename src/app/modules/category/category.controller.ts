@@ -71,7 +71,16 @@ const createCategoryInto = catchAsync(async (req, res) => {
       data: result,
     });
   });
-  
+  const getCategoriesWithSubCategories = catchAsync(async (req, res) => {
+   
+    const result = await CategoryServices.getCategoriesWithSubCategoriesDB();
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Retrived Categories with sub categories",
+      data: result,
+    });
+  });
   export const CategoryControllers = {
    createCategoryInto,
    getAllCategories,
@@ -79,6 +88,6 @@ const createCategoryInto = catchAsync(async (req, res) => {
    updateCategoryInto,
    updateCategoryStatus,
    updateCategoryApprovedStatus,
-  
+   getCategoriesWithSubCategories
   };
   

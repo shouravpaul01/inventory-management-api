@@ -33,9 +33,17 @@ const categorySchema = new Schema<TCategory, CategoryModel>(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
     
   }
 );
+// Define a virtual field to populate subcategories
+categorySchema.virtual("subCategories", {
+  ref: "SubCategory",
+  localField: "_id",
+  foreignField: "category",
+});
 categorySchema.statics.isCategoryNameExists =
   async function isCategoryNameExists(name: string) {
     return await this.findOne({ name: name });

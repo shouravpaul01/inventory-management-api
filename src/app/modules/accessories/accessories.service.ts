@@ -84,18 +84,38 @@ const createAccessoryIntoDB = async (
   }
 };
 
-const getAllAccessoriesDB = async (query: Record<string, unknown>) => {
+const getAllAccessoriesDB = async (query: any) => {
+  const { categories, subCategories, isItReturnable, search } = query;
   const searchableFields = ["name"];
+  const filterQuery: any = {};
+  console.log(query, "main");
+  // if (categories) {
+  //   console.log("1")
+  //   filterQuery.category = { $in: categories.split(",") };
+  //   delete query["categories"];
+  // }
+
+  // // filterQuery. by subCategories (array of IDs)
+  // if (subCategories) {
+  //   console.log("2")
+  //   filterQuery.subCategory = { $in: subCategories.split(",") };
+  //   delete query["subCategories"];
+  // }
+
+  // if (isItReturnable !== undefined) {
+  //   console.log("3")
+  //   filterQuery["isItReturnable"] = isItReturnable;
+  // }
+  console.log(filterQuery,"4")
+  // console.log(query, categories.split(","), filterQuery, "accessory");
   const mainQuery = new QueryBuilder(
-    Accessory.find({})
+    Accessory.find(filterQuery)
       .populate("category")
       .populate("subCategory")
       .populate("stock"),
     query
-  )
-    .filter()
-    .search(searchableFields);
-
+  ).search(searchableFields).filter();
+console.log(mainQuery)
   const totalPages = (await mainQuery.totalPages()).totalQuery;
   const paginateQuery = mainQuery.paginate();
   const accessories = await paginateQuery.modelQuery;
@@ -122,40 +142,37 @@ const updateAccessoryDB = async (
   }
 
   if (file) {
-    isAccessoryExists?.image && await deleteFileFromCloudinary(isAccessoryExists?.image!);
+    isAccessoryExists?.image &&
+      (await deleteFileFromCloudinary(isAccessoryExists?.image!));
     payload.image = file.path;
   }
-    // Generate a new code title if subCategory or codeTitle is provided
-    if (payload.subCategory || payload.codeTitle) {
-      
-      const generateCode = await generateAccessoryCodeTitle(
-        payload.subCategory! ,
-        payload.codeTitle! 
-      );
-  
-      if (generateCode !== isAccessoryExists.codeTitle){
-    
-        // Check if the generated code title already exists in another accessory
-        const isCodeTitleExists = await Accessory.findOne({
-          codeTitle: generateCode,
-          _id: { $ne: accessoryId }, // Exclude the current accessory
-        });
+  // Generate a new code title if subCategory or codeTitle is provided
+  if (payload.subCategory || payload.codeTitle) {
+    const generateCode = await generateAccessoryCodeTitle(
+      payload.subCategory!,
+      payload.codeTitle!
+    );
 
-        if (isCodeTitleExists) {
-          throw new AppError(
-            httpStatus.CONFLICT,
-            "codeTitle",
-            "Code title already exist."
-          );
-        }
+    if (generateCode !== isAccessoryExists.codeTitle) {
+      // Check if the generated code title already exists in another accessory
+      const isCodeTitleExists = await Accessory.findOne({
+        codeTitle: generateCode,
+        _id: { $ne: accessoryId }, // Exclude the current accessory
+      });
+
+      if (isCodeTitleExists) {
+        throw new AppError(
+          httpStatus.CONFLICT,
+          "codeTitle",
+          "Code title already exist."
+        );
       }
-  
-  
-      payload.codeTitle = generateCode; 
     }
-  
-  
-    console.log("3")
+
+    payload.codeTitle = generateCode;
+  }
+
+  console.log("3");
 
   const result = await Accessory.findByIdAndUpdate(accessoryId, payload, {
     new: true,
