@@ -19,7 +19,7 @@ const createAccessoryIntoDB = async (
   payload: TAccessory & { codeTitle: string; quantity: number }
 ) => {
   const session = await mongoose.startSession();
-
+console.log(payload,"pa")
   try {
     await session.startTransaction();
 
@@ -35,24 +35,25 @@ const createAccessoryIntoDB = async (
     if (file) {
       payload.image = file.path;
     }
-
-    // Generate code title and accessory codes
-    const generateCode = await generateAccessoryCodeTitle(
-      payload.subCategory,
-      payload.codeTitle
-    );
-    const isCodeTitleExists = await Accessory.findOne({
-      codeTitle: generateCode,
-    }).session(session);
-
-    if (isCodeTitleExists) {
-      throw new AppError(
-        httpStatus.CONFLICT,
-        "codeTitle",
-        "Code title already exists."
+    if (payload.isItReturnable === "true") {
+      // Generate code title and accessory codes
+      const generateCode = await generateAccessoryCodeTitle(
+        payload.subCategory,
+        payload.codeTitle
       );
+      const isCodeTitleExists = await Accessory.findOne({
+        codeTitle: generateCode,
+      }).session(session);
+
+      if (isCodeTitleExists) {
+        throw new AppError(
+          httpStatus.CONFLICT,
+          "codeTitle",
+          "Code title already exists."
+        );
+      }
+      payload.codeTitle = generateCode;
     }
-    payload.codeTitle = generateCode;
 
     const isCreateStockSuccessResult = new Stock();
     await isCreateStockSuccessResult.save({ session });
@@ -106,7 +107,7 @@ const getAllAccessoriesDB = async (query: any) => {
   //   console.log("3")
   //   filterQuery["isItReturnable"] = isItReturnable;
   // }
-  console.log(filterQuery,"4")
+  console.log(filterQuery, "4");
   // console.log(query, categories.split(","), filterQuery, "accessory");
   const mainQuery = new QueryBuilder(
     Accessory.find(filterQuery)
@@ -114,8 +115,10 @@ const getAllAccessoriesDB = async (query: any) => {
       .populate("subCategory")
       .populate("stock"),
     query
-  ).search(searchableFields).filter();
-console.log(mainQuery)
+  )
+    .search(searchableFields)
+    .filter();
+
   const totalPages = (await mainQuery.totalPages()).totalQuery;
   const paginateQuery = mainQuery.paginate();
   const accessories = await paginateQuery.modelQuery;

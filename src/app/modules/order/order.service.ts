@@ -2,30 +2,62 @@ import { JwtPayload } from "jsonwebtoken";
 import { TOrderItem } from "./order.interface";
 import { Order } from "./order.model";
 import { Accessory } from "../accessories/accessories.modal";
-import { Stock } from "../stock/stock.model";
+import { orderValidation } from "./order.validation";
+import AppError from "../../errors/AppError";
+import httpStatus from "http-status";
+
+import mongoose from 'mongoose';
 
 const createOrderDB = async (
   user: JwtPayload,
-  payload: Partial<TOrderItem[]>
+  payload: TOrderItem[] 
 ) => {
-  console.log(payload, user);
-  const newOrder = {
-    orderBy: user?._id,
-    accessoris: payload,
-  };
-  if (payload) {
-    payload.forEach(async (item) => {
-      const isAccessoryExists = await Accessory.findById(item?.accessory);
-      await Stock.findByIdAndUpdate(isAccessoryExists?.stock, {
-        $inc: {
-          "quantityDetails.currentQuantity": -item?.quantity!,
-          "quantityDetails.orderQuantity": item?.quantity!,
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // Validate payload first
+    const isValidateOrder = orderValidation.safeParse(payload);
+    if (!isValidateOrder.success) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST, 
+        'orderError',
+        "Order failed to proceed. Please try again."
+      );
+    }
+
+    // Create order document
+    const newOrder = {
+      orderBy: user._id,
+      accessories: payload,
+    };
+
+ 
+    for (const item of payload) {
+      await Accessory.findByIdAndUpdate(
+        item.accessory,
+        {
+          $inc: {
+            'quantityDetails.currentQuantity': -item.quantity,
+            'quantityDetails.orderQuantity': item.quantity,
+          },
         },
-      });
-    });
+        { session, new: true } 
+      );
+    }
+
+   
+    const isOrderSuccess = await Order.create([newOrder], { session })
+    session.commitTransaction()
+
+    return isOrderSuccess[0];
+    
+  } catch (error) {
+    await session.abortTransaction();
+    throw error; 
+  } finally {
+    session.endSession();
   }
-  const isOrderSuccess = await Order.create(newOrder);
-  return isOrderSuccess;
 };
 
 export const OrderServices = {

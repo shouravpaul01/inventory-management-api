@@ -76,7 +76,7 @@ const updateSubCategoryApprovedStatusDB = async ( user: JwtPayload,subCategoryId
   return result;
 };
 const getAllActiveSubCategoriesByCategoryDB = async (categoryId:string) => {
-  const result = await SubCategory.find({category:categoryId, isActive: true,isApproved:true });
+  const result = await SubCategory.find({category:categoryId, isActive: true,"approvalDetails.isApproved":true });
   return result;
 };
 export const SubCatServices = {

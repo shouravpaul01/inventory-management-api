@@ -1,26 +1,35 @@
-import mongoose, { Schema } from "mongoose";
+import { model, Schema, Types } from "mongoose";
+import { TReturnDetails } from "./order.interface";
 
-const AccessoryEventSchema = new Schema({
-  event: {
-    type: String,
-    enum: ["notReturned", "returnedOnTime", "overdue"],
+const ReturnDetailsSchema = new Schema<TReturnDetails | undefined>({
+  orderItem: {
+    type: Types.ObjectId,
+    
   },
-  date: {
+  quantity: {
+    type: Number,
+  },
+  codes: [String],
+  returnedAt: {
     type: Date,
-    required: true,
     default: Date.now,
   },
-  user: {
-    type: mongoose.Types.ObjectId,
-    ref: "User",
-    required: true,
+  isReturnedOnTime: {
+    type: Boolean,
+    default: function (this:any ) {
+      return this.returnedAt <= this.parent().returnDeadline!;
+    },
+  },
+  returnReceived: {
+    type: Types.ObjectId,
+    ref:"User"
   },
 });
 
 const AccessoryItemSchema = new Schema(
   {
     accessory: {
-      type: mongoose.Types.ObjectId,
+      type: Types.ObjectId,
       ref: "Accessory",
       required: true,
     },
@@ -35,61 +44,59 @@ const AccessoryItemSchema = new Schema(
     },
     returnDeadline: {
       type: Date,
-      
     },
-
-    events: [AccessoryEventSchema],
+    returnedQuantity: {
+      type: Number,
+      default: 0,
+    },
+    
+    returnedDetails: [ReturnDetailsSchema],
   },
   { _id: false }
 );
 
-const OrderEventSchema = new Schema(
-  {
-    event: {
-      type: String,
-      enum: ["pending", "approved", "delivered", "received", "cancelled"],
-      default: "pending",
-    },
-    date: {
-      type: Date,
-      required: true,
-      default: Date.now,
-    },
-    user: {
-      type: mongoose.Types.ObjectId,
-      ref: "User",
-      
-    },
-    comments: {
-      type: String,
-    },
-  }
-);
+const OrderEventSchema = new Schema({
+  event: {
+    type: String,
+    enum: ["pending", "approved", "delivered", "received", "cancelled"],
+    default: "pending",
+  },
+  date: {
+    type: Date,
+    required: true,
+    default: Date.now,
+  },
+  user: {
+    type: Types.ObjectId,
+    ref: "User",
+  },
+  comments: {
+    type: String,
+  },
+});
 
-const AccessoryOrderSchema = new Schema(
+const orderSchema = new Schema(
   {
     invoiceId: {
       type: String,
-      required: true,
+
       unique: true,
     },
     orderBy: {
-      type: mongoose.Types.ObjectId,
+      type: Types.ObjectId,
       ref: "User",
       required: true,
     },
-    accessories: {
+    items: {
       type: [AccessoryItemSchema],
       required: true,
     },
     orderDate: {
       type: Date,
-      required: true,
       default: Date.now,
     },
     events: {
       type: [OrderEventSchema],
-      
     },
 
     comments: {
@@ -98,8 +105,15 @@ const AccessoryOrderSchema = new Schema(
   },
   { timestamps: true }
 );
-AccessoryOrderSchema.pre("save", async function (next) {
+orderSchema.pre("save", async function (next) {
   if (!this.isNew) return next();
+  if (this.events.length === 0) {
+    this.events.push({
+      event: "pending",
+      date: new Date(),
+      user: this.orderBy,
+    });
+  }
 
   const date = new Date();
   const year = date.getFullYear();
@@ -111,7 +125,4 @@ AccessoryOrderSchema.pre("save", async function (next) {
     .padStart(5, "0")}`;
   next();
 });
-export const Order = mongoose.model(
-  "Order",
-  AccessoryOrderSchema
-);
+export const Order = model("Order", orderSchema);

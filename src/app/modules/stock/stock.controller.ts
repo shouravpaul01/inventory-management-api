@@ -15,7 +15,7 @@ const createStock = catchAsync(async (req, res) => {
   });
 });
 const getAllStocks = catchAsync(async (req, res) => {
-    console.log(req.query)
+    
     const result = await StockService.getAllStocksDB(req.query);
     sendResponse(res, {
       statusCode: httpStatus.OK,

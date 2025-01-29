@@ -58,25 +58,18 @@ const getAllStocksDB = async (query: Record<string, unknown>) => {
 
   // Add dateRange conditions if provided
   if (query?.startDate && query?.endDate) {
-    console.log(
-      new Date(query?.startDate as string),
-      new Date(query?.endDate as string),
-      "date"
-    );
     detailConditions.push(
       { $gte: ["$$detail.createdAt", new Date(query?.startDate as string)] },
       { $lte: ["$$detail.createdAt", new Date(query?.endDate as string)] }
     );
   }
 
-  console.log(detailConditions, "detailsCondition");
   const pipeline = [
     { $match: { _id: new Types.ObjectId(query._id as string) } },
     {
       $project: {
         _id: 1,
-        quantityDetails: 1,
-        codeDetails: 1,
+
         details: {
           $slice: [
             {
@@ -89,8 +82,8 @@ const getAllStocksDB = async (query: Record<string, unknown>) => {
                     : { $literal: true },
               },
             },
-            0, // Start index for pagination
-            limit*page, // Number of items to return
+            0,
+            limit * page,
           ],
         },
       },
@@ -98,8 +91,6 @@ const getAllStocksDB = async (query: Record<string, unknown>) => {
   ];
 
   const stocks = await Stock.aggregate(pipeline);
-
-  console.log(stocks, "stocks");
   return stocks[0];
 };
 
@@ -108,6 +99,7 @@ const updateStockApprovedStatusDB = async (
   stockId: string,
   stockDetailsId: string
 ) => {
+  console.log(stockId,stockDetailsId,"paici")
   // Check if Stock exists
   const isStockExists = await Stock.findOne(
     { _id: stockId, "details._id": stockDetailsId },
@@ -125,20 +117,30 @@ const updateStockApprovedStatusDB = async (
     );
   }
   const isExistsAccessory = await Accessory.findOne({ stock: stockId });
+  if (!isExistsAccessory) {
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      "stockError",
+      "Stock doesn't exist."
+    );
+  }
+  let codes: any = [];
+  if (isExistsAccessory.isItReturnable) {
+    const generateCodes = await generateAccessoriesCode({
+      totalQuantity: isExistsAccessory.quantityDetails.totalQuantity,
+      quantity: isStockExists.details[0].quantity,
+      codeTitle: isExistsAccessory?.codeTitle as string,
+    });
+    codes = generateCodes;
+  }
 
-  const codes = await generateAccessoriesCode({
-    totalQuantity: isStockExists.quantityDetails.totalQuantity,
-    quantity: isStockExists.details[0].quantity,
-    codeTitle: isExistsAccessory?.codeTitle as string,
-  });
-
-  const stockData = {
+  const updateAccessoryData = {
     quantityDetails: {
       totalQuantity:
-        isStockExists.quantityDetails.totalQuantity +
+        isExistsAccessory.quantityDetails.totalQuantity +
         isStockExists.details[0].quantity,
       currentQuantity:
-        isStockExists.quantityDetails.currentQuantity +
+        isExistsAccessory.quantityDetails.currentQuantity +
         isStockExists.details[0].quantity,
     },
 
@@ -146,19 +148,22 @@ const updateStockApprovedStatusDB = async (
       "codeDetails.totalCodes": codes,
       "codeDetails.currentCodes": codes,
     },
-
-    $set: {
-      "details.$.accessoryCodes": codes,
-      "details.$.approvalDetails.isApproved": true,
-      "details.$.approvalDetails.approvedBy": user._id,
-      "details.$.approvalDetails.approvedDate": new Date(),
-    },
   };
- 
+
+  await Accessory.findOneAndUpdate({ stock: stockId }, updateAccessoryData, {
+    new: true,
+  });
   // Update Stock approval details
   const result = await Stock.findOneAndUpdate(
     { _id: stockId, "details._id": stockDetailsId },
-    stockData,
+    {
+      $set: {
+        "details.$.accessoryCodes": codes,
+        "details.$.approvalDetails.isApproved": true,
+        "details.$.approvalDetails.approvedBy": user._id,
+        "details.$.approvalDetails.approvedDate": new Date(),
+      },
+    },
     { new: true }
   );
   return result;

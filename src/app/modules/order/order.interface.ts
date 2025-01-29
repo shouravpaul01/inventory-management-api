@@ -1,36 +1,37 @@
-import mongoose, { Types } from "mongoose";
+import { Types } from "mongoose";
 
+export type TReturnDetails = {
+  orderItem: string;
+  quantity: number;
+  codes: string[];
+  returnedAt: Date;
+  isReturnedOnTime: boolean;
+  returnReceived: string;
+} 
 
-
-type TAccessoryEvent = {
-  event: "assigned" | "returned" | "overdue";
-  date: Date;
-  user: Types.ObjectId;
-};
-
-export type TOrderItem = {
+export type TAccessoryItem = {
   accessory: Types.ObjectId;
   quantity: number;
-  codes:string[]
-  returnDeadline: Date;
-  events: TAccessoryEvent[];
-};
+  codes: string[];
+  returnDeadline?: Date;
+  returnedQuantity: number;
+  returnedDetails: TReturnDetails[];
+} 
 
 type TOrderEvent = {
-  event: "pending" | "approved" | "received" | "handover" | "cancelled";
+  event: "pending" | "approved" | "delivered" | "received" | "cancelled";
   date: Date;
   user: Types.ObjectId;
   comments?: string;
-};
+} 
 
-export type AccessoryOrder = mongoose.Document & {
-  _id?: Types.ObjectId;
+export type TOrder = {
   invoiceId: string;
   orderBy: Types.ObjectId;
-  accessories: TOrderItem[];
+  items: TAccessoryItem[];
   orderDate: Date;
   events: TOrderEvent[];
   comments?: string;
   createdAt: Date;
   updatedAt: Date;
-};
+} 

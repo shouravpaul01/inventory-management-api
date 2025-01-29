@@ -19,24 +19,11 @@ export type TStockDetail = {
   description?: string;
 };
 
-export type TQuantityDetails = {
-  totalQuantity: number;
-  currentQuantity: number;
-  distributedQuantity: number;
-  orderQuantity: number;
-};
 
-export type TCodeDetails = {
-  totalCodes: string[];
-  currentCodes: string[];
-  distributedCodes: string[];
-  orderCodes: string[];
-};
 
 export type TStock = {
   _id?: Types.ObjectId | string;
-  quantityDetails: TQuantityDetails;
-  codeDetails: TCodeDetails;
+  
   details: TStockDetail[];
   createdAt?: Date;
   updatedAt?: Date;

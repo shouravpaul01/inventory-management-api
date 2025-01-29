@@ -20,18 +20,7 @@ const detailSchema = new Schema(
 );
 const stockSchema = new Schema<TStock>(
   {
-    quantityDetails: {
-      totalQuantity: { type: Number, default: 0 },
-      currentQuantity: { type: Number, default: 0 },
-      distributedQuantity: { type: Number, default: 0 },
-      orderQuantity: { type: Number, default: 0 },
-    },
-    codeDetails: {
-      totalCodes: { type: [String], default: [] },
-      currentCodes: { type: [String], default: [] },
-      distributedCodes: { type: [String], default: [] },
-      orderCodes: { type: [String], default: [] },
-    },
+    
     details: [
       detailSchema
     ],

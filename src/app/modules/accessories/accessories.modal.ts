@@ -15,6 +15,18 @@ const accessorySchema = new Schema<TAccessory>({
 
   description: { type: String },
   isItReturnable: { type: Boolean, default: true },
+  quantityDetails: {
+    totalQuantity: { type: Number, default: 0 },
+    currentQuantity: { type: Number, default: 0 },
+    distributedQuantity: { type: Number, default: 0 },
+    orderQuantity: { type: Number, default: 0 },
+  },
+  codeDetails: {
+    totalCodes: { type: [String], default: [] },
+    currentCodes: { type: [String], default: [] },
+    distributedCodes: { type: [String], default: [] },
+    orderCodes: { type: [String], default: [] },
+  },
   stock: {
     type: Schema.Types.ObjectId,
     ref: "Stock",
