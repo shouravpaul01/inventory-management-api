@@ -1,5 +1,4 @@
 import httpStatus from "http-status";
-import { QueryBuilder } from "../../builder/QueryBuilder";
 import AppError from "../../errors/AppError";
 import { TStock, TStockDetail } from "./stock.interface";
 import { Stock } from "./stock.model";

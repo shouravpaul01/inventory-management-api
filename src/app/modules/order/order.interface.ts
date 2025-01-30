@@ -3,16 +3,17 @@ import { Types } from "mongoose";
 export type TReturnDetails = {
   orderItem: string;
   quantity: number;
-  codes: string[];
+  returnedAccessoryCodes: string[];
   returnedAt: Date;
   isReturnedOnTime: boolean;
   returnReceived: string;
 } 
 
-export type TAccessoryItem = {
+export type TOrderItem = {
   accessory: Types.ObjectId;
-  quantity: number;
-  codes: string[];
+  expectedQuantity: number;
+  providedQuantity: number;
+  providedAccessoryCodes: string[];
   returnDeadline?: Date;
   returnedQuantity: number;
   returnedDetails: TReturnDetails[];
@@ -28,7 +29,7 @@ type TOrderEvent = {
 export type TOrder = {
   invoiceId: string;
   orderBy: Types.ObjectId;
-  items: TAccessoryItem[];
+  items: TOrderItem[];
   orderDate: Date;
   events: TOrderEvent[];
   comments?: string;

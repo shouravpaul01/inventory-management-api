@@ -9,7 +9,7 @@ const ReturnDetailsSchema = new Schema<TReturnDetails | undefined>({
   quantity: {
     type: Number,
   },
-  codes: [String],
+  returnedAccessoryCodes: [String],
   returnedAt: {
     type: Date,
     default: Date.now,
@@ -33,12 +33,16 @@ const AccessoryItemSchema = new Schema(
       ref: "Accessory",
       required: true,
     },
-    quantity: {
+    expectedQuantity: {
       type: Number,
       required: true,
       min: 1,
     },
-    codes: {
+    providedQuantity: {
+      type: Number,
+     
+    },
+    providedAccessoryCodes: {
       type: [String],
       default: [],
     },
