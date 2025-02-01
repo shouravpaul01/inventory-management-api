@@ -18,6 +18,10 @@ router.get(
   "/",
   OrderController.getAllOrders
 );
+router.patch(
+  "/update-event/:orderId",auth(USER_ROLE.Admin,USER_ROLE.Faculty),
+  OrderController.updateEventStatus
+);
 
 
 export const OrderRoutes=router

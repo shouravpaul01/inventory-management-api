@@ -21,7 +21,19 @@ const getAllOrders = catchAsync(async (req, res) => {
     data: result,
   });
 });
+const updateEventStatus = catchAsync(async (req, res) => {
+  const {orderId}=req.params
+  const {event}=req.query
+  const result = await OrderServices.updateEventStatusDB(req.user,orderId,event as string);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Successfully updated.",
+    data: result,
+  });
+});
 export const OrderController={
     createOrder,
-    getAllOrders
+    getAllOrders,
+    updateEventStatus
 }

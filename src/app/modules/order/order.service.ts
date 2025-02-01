@@ -55,7 +55,6 @@ const createOrderDB = async (user: JwtPayload, payload: TOrderItem[]) => {
   }
 };
 const getAllOrdersDB = async (query: any) => {
-  
   const searchableFields = ["invoiceId"];
   const filterQuery: any = {};
   console.log(query, "main");
@@ -64,15 +63,19 @@ const getAllOrdersDB = async (query: any) => {
       { $gte: ["orderDate", new Date(query?.startDate as string)] },
       { $lte: ["orderDate", new Date(query?.endDate as string)] }
     );
-    delete query["startDate"]
-    delete query["endDate"]
+    delete query["startDate"];
+    delete query["endDate"];
   }
-
 
   console.log(filterQuery, "4");
 
   const mainQuery = new QueryBuilder(
-    Order.find(filterQuery),
+    Order.find(filterQuery).populate({
+      path: "orderBy",
+      populate: {
+        path: "faculty",
+      },
+    }),
     query
   )
     .search(searchableFields)
@@ -85,7 +88,54 @@ const getAllOrdersDB = async (query: any) => {
   const result = { data: orders, totalPages: totalPages };
   return result;
 };
+const updateEventStatusDB = async (
+  user: JwtPayload,
+  orderId: string,
+  event: string
+) => {
+  const isExistsOrder = await Order.findById(orderId);
+  if (!isExistsOrder) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "orderError",
+      "Order not found!."
+    );
+  }
+  const serialWayProcces:any = {
+    pending: ["approved"],
+    approved: ["delivered"],
+    delivered: ["received"],
+    received: [], 
+  };
+  const lastEvent = isExistsOrder.events.length > 0 
+  ? isExistsOrder.events[isExistsOrder.events.length - 1].event 
+  : "pending"; 
+
+
+if (!serialWayProcces[lastEvent]?.includes(event)) {
+  throw new AppError(
+    httpStatus.BAD_REQUEST,
+    "orderError",
+    "Invaild Process."
+  );
+}
+  const result = await Order.findByIdAndUpdate(
+    orderId,
+    {
+      $push: {
+        events: {
+          event: event,
+          user: user._id,
+        },
+      },
+    },
+    { new: true }
+  );
+  
+  return result;
+};
 export const OrderServices = {
   createOrderDB,
-  getAllOrdersDB
+  getAllOrdersDB,
+  updateEventStatusDB
 };

@@ -99,10 +99,30 @@ const orderSchema = new Schema(
       type: Date,
       default: Date.now,
     },
+    expectedDeliveryDateTime:{
+      type: Date,
+      
+    },
     events: {
       type: [OrderEventSchema],
     },
-
+    
+    // deliveryDetails: {
+    //   deliveryLocation:{
+    //     type:String
+    //   },
+    //   deliveredBy:{
+    //     type:Types.ObjectId,
+    //     ref:"User"
+    //   },
+    //   deliveredDate:{
+    //     type:String,
+    //   },
+    //   isDelivered:{
+    //     type:Boolean,
+    //     default:false
+    //   }
+    // },
     comments: {
       type: String,
     },
