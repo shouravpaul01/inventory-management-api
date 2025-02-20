@@ -5,7 +5,7 @@ const accessoryItemSchema = z.object({
   accessory: z
     .string()
     .nonempty("Accessory ID is required"),
-  quantity: z
+    expectedQuantity: z
     .number()
     .positive("Quantity must be an integer")
     .min(1, "Quantity must be at least 1"),

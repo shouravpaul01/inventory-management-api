@@ -1,3 +1,4 @@
+import { BlobOptions } from "buffer";
 import { Types } from "mongoose";
 
 export type TReturnDetails = {
@@ -6,7 +7,8 @@ export type TReturnDetails = {
   returnedAccessoryCodes: string[];
   returnedAt: Date;
   isReturnedOnTime: boolean;
-  returnReceived: string;
+  isReturnReceived:boolean;
+  returnReceivedBy: string;
 } 
 
 export type TOrderItem = {
@@ -14,6 +16,7 @@ export type TOrderItem = {
   expectedQuantity: number;
   providedQuantity: number;
   providedAccessoryCodes: string[];
+  isProvided:boolean,
   returnDeadline?: Date;
   returnedQuantity: number;
   returnedDetails: TReturnDetails[];
@@ -31,6 +34,7 @@ export type TOrder = {
   orderBy: Types.ObjectId;
   items: TOrderItem[];
   orderDate: Date;
+  expectedDeliveryDateTime:Date;
   events: TOrderEvent[];
   comments?: string;
   createdAt: Date;

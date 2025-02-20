@@ -98,7 +98,7 @@ const updateStockApprovedStatusDB = async (
   stockId: string,
   stockDetailsId: string
 ) => {
-  console.log(stockId,stockDetailsId,"paici")
+ 
   // Check if Stock exists
   const isStockExists = await Stock.findOne(
     { _id: stockId, "details._id": stockDetailsId },

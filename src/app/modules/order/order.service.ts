@@ -44,14 +44,15 @@ const createOrderDB = async (user: JwtPayload, payload: TOrderItem[]) => {
     }
 
     const isOrderSuccess = await Order.create([newOrder], { session });
-    session.commitTransaction();
+    await session.commitTransaction();
 
     return isOrderSuccess[0];
   } catch (error) {
+    console.log(error);
     await session.abortTransaction();
     throw error;
   } finally {
-    session.endSession();
+    await session.endSession();
   }
 };
 const getAllOrdersDB = async (query: any) => {
@@ -88,6 +89,14 @@ const getAllOrdersDB = async (query: any) => {
   const result = { data: orders, totalPages: totalPages };
   return result;
 };
+const getSingleOrderDB = async (orderId: string) => {
+  console.log(orderId, "orderId");
+  const result = await Order.findById(orderId).populate({
+    path: "items.accessory",
+    populate: [{ path: "category" }, { path: "subCategory" }],
+  });
+  return result;
+};
 const updateEventStatusDB = async (
   user: JwtPayload,
   orderId: string,
@@ -101,24 +110,24 @@ const updateEventStatusDB = async (
       "Order not found!."
     );
   }
-  const serialWayProcces:any = {
+  const serialWayProcces: any = {
     pending: ["approved"],
     approved: ["delivered"],
     delivered: ["received"],
-    received: [], 
+    received: [],
   };
-  const lastEvent = isExistsOrder.events.length > 0 
-  ? isExistsOrder.events[isExistsOrder.events.length - 1].event 
-  : "pending"; 
+  const lastEvent =
+    isExistsOrder.events.length > 0
+      ? isExistsOrder.events[isExistsOrder.events.length - 1].event
+      : "pending";
 
-
-if (!serialWayProcces[lastEvent]?.includes(event)) {
-  throw new AppError(
-    httpStatus.BAD_REQUEST,
-    "orderError",
-    "Invaild Process."
-  );
-}
+  if (!serialWayProcces[lastEvent]?.includes(event)) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "orderError",
+      "Invaild Process."
+    );
+  }
   const result = await Order.findByIdAndUpdate(
     orderId,
     {
@@ -131,11 +140,86 @@ if (!serialWayProcces[lastEvent]?.includes(event)) {
     },
     { new: true }
   );
-  
+
   return result;
+};
+
+const updateOrderItemsDB = async (
+  orderId: string,
+  itemId: string,
+  payload: any
+) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const updateItem: any = {};
+    for (const key in payload) {
+      if (payload[key] !== undefined) {
+        updateItem[`items.$.${key}`] = payload[key];
+      }
+    }
+
+    const isOrderItemExists = await Order.findOne(
+      { _id: orderId, "items.accessory": itemId },
+      {
+        "items.$": 1,
+      },
+      { session }
+    );
+
+    console.log(isOrderItemExists);
+    if (!isOrderItemExists) {
+      throw new Error("Order or item not found");
+    }
+    const itemExists = isOrderItemExists.items[0];
+    console.log(itemExists);
+    const qty =
+      itemExists.expectedQuantity - (payload as TOrderItem).providedQuantity;
+    const updateAccessoryData: any = {
+      $inc: {
+        "quantityDetails.currentQuantity": qty,
+        "quantityDetails.orderQuantity": -qty,
+      },
+    };
+    if ((payload as TOrderItem)?.providedAccessoryCodes?.length > 0) {
+      (updateAccessoryData["$push"] = {
+        "codeDetails.orderCodes": (payload as TOrderItem)
+          ?.providedAccessoryCodes,
+      }),
+        (updateAccessoryData["$pull"] = {
+          "codeDetails.currentCodes": {
+            $in: (payload as TOrderItem)?.providedAccessoryCodes,
+          },
+        });
+    }
+    console.log(updateAccessoryData,"li")
+    await Accessory.findByIdAndUpdate(itemId, updateAccessoryData, { session });
+
+    const result = await Order.findOneAndUpdate(
+      { _id: orderId, "items.accessory": itemId },
+      { $set: updateItem },
+      { new: true, session }
+    );
+
+    if (!result) {
+      throw new Error("Order or item not found");
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return null;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
 };
 export const OrderServices = {
   createOrderDB,
   getAllOrdersDB,
-  updateEventStatusDB
+  getSingleOrderDB,
+  updateEventStatusDB,
+  updateOrderItemsDB,
 };

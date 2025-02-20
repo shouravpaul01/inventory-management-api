@@ -18,9 +18,17 @@ router.get(
   "/",
   OrderController.getAllOrders
 );
+router.get(
+  "/single-order/:orderId",
+  OrderController.getSingleOrder
+);
 router.patch(
   "/update-event/:orderId",auth(USER_ROLE.Admin,USER_ROLE.Faculty),
   OrderController.updateEventStatus
+);
+router.patch(
+  "/update-order-items/:orderId/:itemId",auth(USER_ROLE.Admin),
+  OrderController.updateOrderItems
 );
 
 

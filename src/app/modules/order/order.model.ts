@@ -4,7 +4,6 @@ import { TReturnDetails } from "./order.interface";
 const ReturnDetailsSchema = new Schema<TReturnDetails | undefined>({
   orderItem: {
     type: Types.ObjectId,
-    
   },
   quantity: {
     type: Number,
@@ -16,13 +15,17 @@ const ReturnDetailsSchema = new Schema<TReturnDetails | undefined>({
   },
   isReturnedOnTime: {
     type: Boolean,
-    default: function (this:any ) {
+    default: function (this: any) {
       return this.returnedAt <= this.parent().returnDeadline!;
     },
   },
-  returnReceived: {
+  isReturnReceived: {
+    type: Boolean,
+    default: false,
+  },
+  returnReceivedBy: {
     type: Types.ObjectId,
-    ref:"User"
+    ref: "User",
   },
 });
 
@@ -40,11 +43,14 @@ const AccessoryItemSchema = new Schema(
     },
     providedQuantity: {
       type: Number,
-     
     },
     providedAccessoryCodes: {
       type: [String],
       default: [],
+    },
+    isProvided:{
+      type:Boolean,
+      default:false
     },
     returnDeadline: {
       type: Date,
@@ -53,7 +59,7 @@ const AccessoryItemSchema = new Schema(
       type: Number,
       default: 0,
     },
-    
+
     returnedDetails: [ReturnDetailsSchema],
   },
   { _id: false }
@@ -99,14 +105,13 @@ const orderSchema = new Schema(
       type: Date,
       default: Date.now,
     },
-    expectedDeliveryDateTime:{
+    expectedDeliveryDateTime: {
       type: Date,
-      
     },
     events: {
       type: [OrderEventSchema],
     },
-    
+
     // deliveryDetails: {
     //   deliveryLocation:{
     //     type:String
