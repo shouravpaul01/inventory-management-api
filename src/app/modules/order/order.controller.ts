@@ -53,10 +53,46 @@ const updateOrderItems = catchAsync(async (req, res) => {
     data: result,
   });
 });
+const getAllOrdersByUsers = catchAsync(async (req, res) => {
+  const { userId } = req.params;
+  const result = await OrderServices.getAllOrdersByUsersDB(userId, req.query as Record<string,undefined>);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Successfully retrieved orders by user.",
+    data: result,
+  });
+})
+const updateExpectedQuantity = catchAsync(async (req, res) => {
+  const { orderId } = req.params;
+  const payload = req.body;
+ 
+  const result = await OrderServices.updateExpectedQuantityDB(orderId, payload);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Successfully updated expected quantity.",
+    data: result,
+  });
+})
+const returnedAccessoriesCodes= catchAsync(async (req, res) => {
+  const { orderId } = req.params;
+  const returnDetails = req.body;
+  const result = await OrderServices.returnedAccessoriesCodeDB(orderId, returnDetails);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Successfully returned accessories codes.",
+    data: result,
+  });
+})
 export const OrderController={
     createOrder,
     getAllOrders,
     getSingleOrder,
     updateEventStatus,
-    updateOrderItems
+    updateOrderItems,
+    getAllOrdersByUsers,
+    updateExpectedQuantity,
+    returnedAccessoriesCodes
 }

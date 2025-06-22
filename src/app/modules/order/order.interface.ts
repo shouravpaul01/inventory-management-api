@@ -2,9 +2,9 @@ import { BlobOptions } from "buffer";
 import { Types } from "mongoose";
 
 export type TReturnDetails = {
-  orderItem: string;
+  accessory: string;
   quantity: number;
-  returnedAccessoryCodes: string[];
+  returnedAccessoriesCodes: string[];
   returnedAt: Date;
   isReturnedOnTime: boolean;
   isReturnReceived:boolean;
@@ -19,6 +19,8 @@ export type TOrderItem = {
   isProvided:boolean,
   returnDeadline?: Date;
   returnedQuantity: number;
+  returnedAllAccessoriesCodes: string[];
+  isAllAccessoriesReturned: boolean;
   returnedDetails: TReturnDetails[];
 } 
 

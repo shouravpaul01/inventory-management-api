@@ -1,7 +1,7 @@
 import { JwtPayload } from "jsonwebtoken";
 import { Order } from "./order.model";
 import { Accessory } from "../accessories/accessories.modal";
-import { TOrderItem } from "./order.interface";
+import { TOrderItem, TReturnDetails } from "./order.interface";
 import { orderValidation } from "./order.validation";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
@@ -193,7 +193,7 @@ const updateOrderItemsDB = async (
           },
         });
     }
-    console.log(updateAccessoryData,"li")
+
     await Accessory.findByIdAndUpdate(itemId, updateAccessoryData, { session });
 
     const result = await Order.findOneAndUpdate(
@@ -216,10 +216,104 @@ const updateOrderItemsDB = async (
     throw error;
   }
 };
+const getAllOrdersByUsersDB = async (
+  userId: string,
+  query: Record<string, undefined>
+) => {
+  const searchableFields = ["invoiceId"];
+  const filterQuery: any = {};
+
+  if (userId) {
+    filterQuery.orderBy = userId;
+  } else {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "orderError",
+      "User ID is required."
+    );
+  }
+  console.log(filterQuery, "filterQuery");
+  const mainQuery = new QueryBuilder(
+    Order.find(filterQuery).populate({
+      path: "orderBy",
+      populate: {
+        path: "faculty",
+      },
+    }),
+    query
+  )
+    .search(searchableFields)
+    .filter();
+
+  const totalPages = (await mainQuery.totalPages()).totalQuery;
+  const paginateQuery = mainQuery.paginate();
+  const orders = await paginateQuery.modelQuery;
+
+  const result = { data: orders, totalPages: totalPages };
+  return result;
+};
+const updateExpectedQuantityDB = async (orderId: string,
+  payload: Partial<TOrderItem>) => {
+    if (!orderId && !payload.accessory) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "orderError",
+        "Accessory ID is required."
+      );
+    }
+  const result = await Order.findOneAndUpdate(
+    { _id: orderId, "items.accessory": payload.accessory! },
+    { $set: { "items.$.expectedQuantity": payload.expectedQuantity } },
+    { new: true }
+  );
+
+  return result;
+};
+const returnedAccessoriesCodeDB = async (
+  orderId: string,
+  payload: Partial<TReturnDetails>
+) => {
+  
+  if (!payload.accessory) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "orderError",
+      "Accessory ID is required."
+    );
+  }
+  payload.quantity = payload.returnedAccessoriesCodes?.length || 0;
+  const result = await Order.findOneAndUpdate(
+    {
+      _id: orderId,
+      "items.accessory": payload.accessory!, // assuming itemId is the accessory ID
+    },
+    {
+      $push: {
+        "items.$[item].returnedDetails": payload,
+        "items.$[item].returnedAllAccessoriesCodes":
+          payload.returnedAccessoriesCodes!,
+      },
+
+      $inc: {
+        "items.$[item].returnedQuantity":
+          payload.returnedAccessoriesCodes!.length,
+      },
+    },
+    {
+      arrayFilters: [{ "item.accessory": payload.accessory! }],
+      new: true,
+    }
+  );
+
+  return result;
+};
 export const OrderServices = {
   createOrderDB,
   getAllOrdersDB,
   getSingleOrderDB,
   updateEventStatusDB,
   updateOrderItemsDB,
+  getAllOrdersByUsersDB,
+  updateExpectedQuantityDB,
+  returnedAccessoriesCodeDB,
 };

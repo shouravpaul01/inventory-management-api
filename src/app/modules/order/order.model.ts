@@ -2,13 +2,13 @@ import { model, Schema, Types } from "mongoose";
 import { TReturnDetails } from "./order.interface";
 
 const ReturnDetailsSchema = new Schema<TReturnDetails | undefined>({
-  orderItem: {
+  accessory: {
     type: Types.ObjectId,
   },
   quantity: {
     type: Number,
   },
-  returnedAccessoryCodes: [String],
+  returnedAccessoriesCodes: [String],
   returnedAt: {
     type: Date,
     default: Date.now,
@@ -48,18 +48,23 @@ const AccessoryItemSchema = new Schema(
       type: [String],
       default: [],
     },
-    isProvided:{
-      type:Boolean,
-      default:false
+    isProvided: {
+      type: Boolean,
+      default: false,
     },
     returnDeadline: {
       type: Date,
     },
+
     returnedQuantity: {
       type: Number,
       default: 0,
     },
-
+    returnedAllAccessoriesCodes: { type: [String], default: [] },
+    isAllAccessoriesReturned: {
+      type: Boolean,
+      default: false,
+    },
     returnedDetails: [ReturnDetailsSchema],
   },
   { _id: false }
