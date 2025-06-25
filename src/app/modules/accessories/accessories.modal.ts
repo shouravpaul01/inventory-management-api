@@ -22,10 +22,10 @@ const accessorySchema = new Schema<TAccessory>({
     orderQuantity: { type: Number, default: 0 },
   },
   codeDetails: {
-    totalCodes: { type: [String], default: [] },
-    currentCodes: { type: [String], default: [] },
-    distributedCodes: { type: [String], default: [] },
-    orderCodes: { type: [String], default: [] },
+    totalCodes: { type: [String], default: [], sort: "asc" },
+    currentCodes: { type: [String], default: [], sort: "asc" },
+    distributedCodes: { type: [String], default: [], sort: "asc" },
+    orderCodes: { type: [String], default: [], sort: "asc" },
   },
   stock: {
     type: Schema.Types.ObjectId,

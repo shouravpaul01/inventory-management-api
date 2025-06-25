@@ -86,6 +86,18 @@ const returnedAccessoriesCodes= catchAsync(async (req, res) => {
     data: result,
   });
 })
+const returnedAccessoriesReceived=catchAsync(async(req,res)=>{
+  const { orderId, accessoryId, returnedId } = req.params;
+
+  const user = req.user._id;
+  const result = await OrderServices.returnedAccessoriesReceivedDB(orderId, accessoryId, returnedId, user, req.body);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Successfully received returned accessories.",
+    data: result,
+  });
+})
 export const OrderController={
     createOrder,
     getAllOrders,
@@ -94,5 +106,6 @@ export const OrderController={
     updateOrderItems,
     getAllOrdersByUsers,
     updateExpectedQuantity,
-    returnedAccessoriesCodes
+    returnedAccessoriesCodes,
+    returnedAccessoriesReceived
 }

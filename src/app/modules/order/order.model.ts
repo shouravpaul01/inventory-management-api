@@ -66,8 +66,7 @@ const AccessoryItemSchema = new Schema(
       default: false,
     },
     returnedDetails: [ReturnDetailsSchema],
-  },
-  { _id: false }
+  }
 );
 
 const OrderEventSchema = new Schema({

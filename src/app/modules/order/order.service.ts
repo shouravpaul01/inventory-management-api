@@ -8,6 +8,7 @@ import httpStatus from "http-status";
 
 import mongoose from "mongoose";
 import { QueryBuilder } from "../../builder/QueryBuilder";
+import { error } from "console";
 
 const createOrderDB = async (user: JwtPayload, payload: TOrderItem[]) => {
   const session = await mongoose.startSession();
@@ -71,12 +72,16 @@ const getAllOrdersDB = async (query: any) => {
   console.log(filterQuery, "4");
 
   const mainQuery = new QueryBuilder(
-    Order.find(filterQuery).populate({
-      path: "orderBy",
-      populate: {
-        path: "faculty",
-      },
-    }),
+    Order.find(filterQuery)
+      .populate({
+        path: "items.accessory",
+      })
+      .populate({
+        path: "orderBy",
+        populate: {
+          path: "faculty",
+        },
+      }),
     query
   )
     .search(searchableFields)
@@ -91,10 +96,19 @@ const getAllOrdersDB = async (query: any) => {
 };
 const getSingleOrderDB = async (orderId: string) => {
   console.log(orderId, "orderId");
-  const result = await Order.findById(orderId).populate({
-    path: "items.accessory",
-    populate: [{ path: "category" }, { path: "subCategory" }],
-  });
+  const result = await Order.findById(orderId)
+    .populate({
+      path: "items.accessory",
+      populate: [{ path: "category" }, { path: "subCategory" }],
+    })
+    .populate({
+      path: "orderBy",
+      select: "faculty",
+      populate: {
+        path: "faculty",
+        select: "name email roomNo phone department designation ",
+      },
+    });
   return result;
 };
 const updateEventStatusDB = async (
@@ -168,7 +182,6 @@ const updateOrderItemsDB = async (
       { session }
     );
 
-    console.log(isOrderItemExists);
     if (!isOrderItemExists) {
       throw new Error("Order or item not found");
     }
@@ -252,15 +265,16 @@ const getAllOrdersByUsersDB = async (
   const result = { data: orders, totalPages: totalPages };
   return result;
 };
-const updateExpectedQuantityDB = async (orderId: string,
-  payload: Partial<TOrderItem>) => {
-    if (!orderId && !payload.accessory) {
-      throw new AppError(
-        httpStatus.BAD_REQUEST,
-        "orderError",
-        "Accessory ID is required."
-      );
-    }
+const updateExpectedQuantityDB = async (
+  orderId: string,
+  payload: Partial<TOrderItem>
+) => {
+  if (!orderId && !payload.accessory) {
+    throw new Error(
+      
+      "Accessory ID is required."
+    );
+  }
   const result = await Order.findOneAndUpdate(
     { _id: orderId, "items.accessory": payload.accessory! },
     { $set: { "items.$.expectedQuantity": payload.expectedQuantity } },
@@ -273,7 +287,6 @@ const returnedAccessoriesCodeDB = async (
   orderId: string,
   payload: Partial<TReturnDetails>
 ) => {
-  
   if (!payload.accessory) {
     throw new AppError(
       httpStatus.BAD_REQUEST,
@@ -307,6 +320,80 @@ const returnedAccessoriesCodeDB = async (
 
   return result;
 };
+const returnedAccessoriesReceivedDB = async (
+  orderId: string,
+  accessoryId: string,
+  returnedId: string,
+  userId: string,
+  payload: Partial<TReturnDetails>
+) => {
+  if (!orderId && !accessoryId && !returnedId) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "orderError",
+      "Order ID, Accessory ID, and Returned ID are required."
+    );
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const result = await Order.findOneAndUpdate(
+      {
+        _id: orderId,
+        "items.accessory": accessoryId,
+        "items.returnedDetails._id": returnedId,
+      },
+      {
+        $set: {
+          "items.$[item].returnedDetails.$[detail].isReturnReceived": true,
+          "items.$[item].returnedDetails.$[detail].returnReceivedBy": userId,
+        },
+      },
+      {
+        arrayFilters: [
+          { "item.accessory": accessoryId },
+          { "detail._id": returnedId },
+        ],
+        new: true,
+        session, 
+      }
+    );
+if (!result) {
+  throw new Error("Failed to receive returned accessories.");
+}
+    const isAccessoryResult = await Accessory.findByIdAndUpdate(
+      accessoryId,
+      {
+        $inc: {
+          "quantityDetails.currentQuantity": payload.quantity,
+          "quantityDetails.orderQuantity": -payload.quantity!,
+        },
+        $push: { "codeDetails.currentCodes": { $each: payload.returnedAccessoriesCodes } },
+        $pull: {
+          "codeDetails.orderCodes": {
+            $in: payload.returnedAccessoriesCodes!,
+          },
+          
+        },
+      },
+    
+      { new: true, session } 
+    );
+if (!isAccessoryResult) {
+  throw new Error("Failed to receive returned accessories.");
+}
+    await session.commitTransaction();
+    session.endSession();
+
+    return result;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error; 
+  }
+};
 export const OrderServices = {
   createOrderDB,
   getAllOrdersDB,
@@ -316,4 +403,5 @@ export const OrderServices = {
   getAllOrdersByUsersDB,
   updateExpectedQuantityDB,
   returnedAccessoriesCodeDB,
+  returnedAccessoriesReceivedDB,
 };

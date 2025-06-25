@@ -38,5 +38,5 @@ router.get(
   OrderController.updateExpectedQuantity)
 router.patch(
   "/returned-accessories/:orderId", validateRequest(returnedAccessoriesSchemaValidation), OrderController.returnedAccessoriesCodes)
-
+router.patch("/returned-accessories-received/:orderId/:accessoryId/:returnedId",auth(USER_ROLE.Admin), OrderController.returnedAccessoriesReceived)
 export const OrderRoutes=router
