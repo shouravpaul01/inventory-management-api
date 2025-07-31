@@ -251,8 +251,10 @@ const getAllOrdersByUsersDB = async (
       path: "orderBy",
       populate: {
         path: "faculty",
-      },
-    }),
+      }
+    }).populate(
+    "items.accessory",
+     ),
     query
   )
     .search(searchableFields)

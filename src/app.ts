@@ -9,6 +9,7 @@ import { AuthRoutes } from './app/modules/auth/auth.route'
 import { AccessoryRouters } from './app/modules/accessories/accessories.route'
 import { StockRoutes } from './app/modules/stock/stock.route'
 import { OrderRoutes } from './app/modules/order/order.route'
+import { RoomRoutes } from './app/modules/rooms/room.route'
 const app = express()
 
 app.use(express.json())
@@ -18,6 +19,7 @@ app.use(cors())
 app.use("/api/v1/users",UserRoutes)
 app.use("/api/v1/faculties",FacultyRoutes)
 app.use("/api/v1/auth",AuthRoutes)
+app.use("/api/v1/rooms",RoomRoutes)
 app.use("/api/v1/categories",CategoryRoutes)
 app.use("/api/v1/sub-categories",SubCatRoutes)
 app.use("/api/v1/accessories",AccessoryRouters)

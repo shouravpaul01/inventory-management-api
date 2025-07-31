@@ -1,6 +1,33 @@
 import { model, Schema, Types } from "mongoose";
 import { TDistribute } from "./distribute.interface";
-
+import { TReturnDetails } from "../order/order.interface";
+const ReturnDetailsSchema = new Schema<TReturnDetails | undefined>({
+  accessory: {
+    type: Types.ObjectId,
+  },
+  quantity: {
+    type: Number,
+  },
+  returnedAccessoriesCodes: [String],
+  returnedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  isReturnedOnTime: {
+    type: Boolean,
+    default: function (this: any) {
+      return this.returnedAt <= this.parent().returnDeadline!;
+    },
+  },
+  isReturnReceived: {
+    type: Boolean,
+    default: false,
+  },
+  returnReceivedBy: {
+    type: Types.ObjectId,
+    ref: "User",
+  },
+});
 const AccessoryItemSchema = new Schema({
   accessory: {
     type: Types.ObjectId,
@@ -20,6 +47,17 @@ const AccessoryItemSchema = new Schema({
     type: Boolean,
     default: false,
   },
+
+  returnedQuantity: {
+    type: Number,
+    default: 0,
+  },
+  returnedAllAccessoriesCodes: { type: [String], default: [] },
+  isAllAccessoriesReturned: {
+    type: Boolean,
+    default: false,
+  },
+  returnedDetails: [ReturnDetailsSchema],
 });
 
 const distibuteEventSchema = new Schema({
@@ -49,10 +87,11 @@ const distributeSchema = new Schema<TDistribute | undefined>(
 
       unique: true,
     },
-    distributedBy: {
+    
+     requester: {
       type: Types.ObjectId,
       ref: "User",
-      required: true,
+      
     },
     items: {
       type: [AccessoryItemSchema],
@@ -62,24 +101,56 @@ const distributeSchema = new Schema<TDistribute | undefined>(
       type: Date,
       default: Date.now,
     },
-    location: {
-      type: {
+    distributedTo: {
+      locationType: {
+        type: String,
+        enum: [
+          "classroom",
+          "office",
+          "lab",
+          "storage",
+          "event_venue",
+          "library",
+          "canteen",
+          "other",
+        ],
+        required: true,
+      },
+      user: {
+        type: Types.ObjectId,
+        ref: "User",
+      },
+      department: {
         type: String,
       },
-      palce: {
+      roomNo: {
+        type: String,
+      },
+      place: {
         type: String,
       },
     },
-
     events: {
       type: [distibuteEventSchema],
     },
-
-    comments: {
+     purpose: {
+      type: String,
+      enum: [
+        "academic", 
+        "research", 
+        "administrative", 
+        "event", 
+        "maintenance",
+        "other"
+      ],
+      required: true
+    },
+    description: {
       type: String,
     },
+   
   },
   { timestamps: true }
 );
 
-export const Distibute = model("Distibute", distributeSchema);
+export const Distibute = model("Distribute", distributeSchema);
