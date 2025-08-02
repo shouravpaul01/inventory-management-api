@@ -1,14 +1,18 @@
+
 import { Model, Types } from "mongoose";
-export type TApprovalDetails = {
-  isApproved: boolean;
-  approvedBy?: Types.ObjectId | string; 
-  approvedDate?: Date;
+export type TEventHistory = {
+  eventType: "created" | "updated" | "approved" | "activated" | "deactivated" ;
+  performedBy: Types.ObjectId;
+  performedAt?: Date;
+  comments?: string;
 };
 export type TCategory = {
   name: string;
   description?: string;
   isActive: boolean;
-  approvalDetails: TApprovalDetails;
+  isApproved:boolean;
+  isDeleted:boolean;
+  eventsHistory: TEventHistory[];
 };
 
 export interface CategoryModel extends Model<TCategory> {

@@ -10,14 +10,14 @@ import auth from "../../middlewares/auth";
 const router = express.Router();
 
 router.post(
-  "/create-category",
+  "/create-category",auth(USER_ROLE.Admin),
   validateRequest(categoryValidationSchema),
   CategoryControllers.createCategoryInto
 );
 router.get('/',CategoryControllers.getAllCategories)
 router.get('/single-category/:categoryId',CategoryControllers.getSingleCategory)
-router.patch('/update-category/:categoryId',validateRequest(categoryValidationSchema),CategoryControllers.updateCategoryInto)
-router.patch('/update-active-status/:categoryId',CategoryControllers.updateCategoryStatus)
+router.patch('/update-category/:categoryId',auth(USER_ROLE.Admin),validateRequest(categoryValidationSchema),CategoryControllers.updateCategoryInto)
+router.patch('/update-active-status/:categoryId',auth(USER_ROLE.Admin),CategoryControllers.updateCategoryStatus)
 router.patch('/update-approved-status/:categoryId',auth(USER_ROLE.Admin),CategoryControllers.updateCategoryApprovedStatus)
 router.get("/categories-with-subcategories",CategoryControllers.getCategoriesWithSubCategories)
 

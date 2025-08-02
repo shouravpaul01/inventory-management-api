@@ -1,31 +1,54 @@
 import { Types } from "mongoose";
-export type TApprovalDetails = {
-  isApproved: boolean;
-  approvedBy?: Types.ObjectId | string;
-  approvedDate?: Date;
+
+export type TEventHistory = {
+  eventType: "created" | "updated" | "approved" | "activated" | "deactivated" | "distributed";
+  performedBy: Types.ObjectId;
+  performedAt?: Date;
+  comments?: string;
 };
+
+
+
 export type TRoom = {
+  _id?: Types.ObjectId;
   roomNo: string;
-  department: string;
-  building: string;
+  building?: string;
   floor: string;
-  roomType: string;
+  roomType:
+    | "Classroom"
+    | "Teacher Room"
+    | "Lecture Hall"
+    | "Laboratory"
+    | "Office"
+    | "Conference"
+    | "Storage"
+    | "Server Room"
+    | "Library"
+    | "Workshop"
+    | "Other";
   capacity?: number;
   images?: string[];
+  department?: string;
+  assignedRoom?: Types.ObjectId;
   description?: string;
-
-  features: string[];
-  equipment: {
-    accessories: {
-      accessory: Types.ObjectId;
-      quantity: number;
-      codes: string[];
-    }[];
-    totalQuantity: number;
-  }[];
-  isActive: boolean;
-  createdBy: Types.ObjectId;
-  approvalDetails: TApprovalDetails;
-  createdAt: Date;
-  updatedAt: Date;
+  features: (
+    | "Projector"
+    | "Whiteboard"
+    | "Smart Board"
+    | "Sound System"
+    | "AC"
+    | "Heating"
+    | "WiFi"
+    | "Disabled Access"
+    | "Video Conferencing"
+    | "Furniture"
+  )[];
+  distributedAccessoriesDetails:string[];
+  
+  isActive?: boolean;
+  isApproved?: boolean;
+  isDeleted?:boolean;
+  eventsHistory?: TEventHistory[];
+  createdAt?: Date;
+  updatedAt?: Date;
 };

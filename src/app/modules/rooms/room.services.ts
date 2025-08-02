@@ -5,104 +5,173 @@ import { QueryBuilder } from "../../builder/QueryBuilder";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
 import { deleteFileFromCloudinary } from "../../utils/deleteFileFromCloudinary";
+import { TFileUpload } from "../../interfaces";
+import { Types } from "mongoose";
+
+
+const logEvent = (
+  
+  type:
+    | "created"
+    | "updated"
+    | "approved"
+    | "activated"
+    | "deactivated"
+    | "distributed",
+  userId: Types.ObjectId,
+  comments?: string
+) => ({
+  eventType: type,
+  performedBy: userId,
+  performedAt: new Date(),
+  comments,
+});
 
 const createRoomIntoDB = async (
   payload: TRoom,
   user: JwtPayload,
-  files: any
+  
 ) => {
-  const imagesUrls = files?.map((file: any) => file.path);
-  if (imagesUrls?.length > 0) {
-    payload.images = imagesUrls;
-  }else{
-    throw new AppError(httpStatus.NOT_FOUND,"images","Images are required.")
-  }
-  payload.createdBy = user._id;
+  
+
+
+  payload.eventsHistory = [logEvent("created", user.faculty, "Room created")];
 
   const result = await Room.create(payload);
   return result;
 };
+
 const getAllRoomsDB = async (query: Record<string, unknown>) => {
-  const searchableFields = ["roomNo", "building","floor"];
+  const searchableFields = ["roomNo", "building", "floor"];
+
   const mainQuery = new QueryBuilder(Room.find({}), query)
     .filter()
     .search(searchableFields);
 
   const totalPages = (await mainQuery.totalPages()).totalQuery;
-  const categoryQuery = mainQuery.paginate();
-  const categories = await categoryQuery.modelQuery;
+  const rooms = await mainQuery.paginate().modelQuery;
 
-  const result = { data: categories, totalPages: totalPages };
-  return result;
+  return { data: rooms, totalPages };
 };
+
 const getSingleRoomDB = async (roomId: string) => {
-  const result = await Room.findById(roomId);
-  return result;
-};
-const deleteSingleImageDB = async (roomId: string,imageUrl:string) => {
-  const isRoomExists=await Room.findById(roomId)
-  const isDeleteImage=await deleteFileFromCloudinary(imageUrl)
-  if (!isRoomExists && !imageUrl) {
-    throw new AppError(httpStatus.NOT_FOUND,"roomError","Room does not exist.")
+  const room = await Room.findById(roomId).populate('eventsHistory.performedBy');
+  if (!room) {
+    throw new AppError(httpStatus.NOT_FOUND, "roomError", "Room not found.");
   }
-  if (!isDeleteImage) {
-    throw new AppError(httpStatus.NOT_FOUND,"roomError","Room does not exist.")
-  }
-  const result=await Room.findByIdAndUpdate(roomId,{$pull:{images:imageUrl}},{new:true})
-  return result;
+  return room;
 };
+
+const deleteSingleImageDB = async (roomId: string, imageUrl: string) => {
+  const room = await Room.findById(roomId);
+  if (!room || !imageUrl) {
+    throw new AppError(httpStatus.NOT_FOUND, "roomError", "Room does not exist.");
+  }
+
+  const deleted = await deleteFileFromCloudinary(imageUrl);
+  if (!deleted) {
+    throw new AppError(httpStatus.NOT_FOUND, "imageError", "Failed to delete image.");
+  }
+
+  const updatedRoom = await Room.findByIdAndUpdate(
+    roomId,
+    { $pull: { images: imageUrl } },
+    { new: true }
+  );
+
+  return updatedRoom;
+};
+
 const updateRoomIntoDB = async (
-  categoryId: string,
-  payload: Partial<TRoom>
+  roomId: string,
+  payload: Partial<TRoom>,
+  files: TFileUpload[],
+  user: JwtPayload
 ) => {
-  const result = await Room.findByIdAndUpdate(categoryId, payload, {
+  const room = await Room.findById(roomId);
+  if (!room) {
+    throw new AppError(httpStatus.NOT_FOUND, "roomError", "Room not found.");
+  }
+
+  if (room.images!.length === 0 && (!files || files.length === 0)) {
+    throw new AppError(httpStatus.BAD_REQUEST, "images", "Images field is required.");
+  }
+
+  if (files && files.length > 0) {
+    const imageUrls = files.map((file) => file.path);
+    payload.images = [...room.images!, ...imageUrls];
+  } else {
+    delete payload.images;
+  }
+
+  const updateWithEvent = {
+    ...payload,
+    $push: {
+      eventsHistory: logEvent("updated", new Types.ObjectId(user.faculty), "Room updated"),
+    },
+  };
+
+  const updatedRoom = await Room.findByIdAndUpdate(roomId, updateWithEvent, {
     new: true,
   });
-  return result;
+
+  return updatedRoom;
 };
+
 const updateRoomStatusDB = async (
   roomId: string,
-  isActive: boolean
+  isActive: string,
+  user: JwtPayload
 ) => {
-  const isCategoryExists = await Room.findById(roomId);
-  if (!isCategoryExists) {
-    throw new AppError(
-      httpStatus.NOT_FOUND,
-      "roomError",
-      "Category does not exist."
+  try {
+    const room = await Room.findById(roomId);
+    if (!room) {
+      throw new AppError(httpStatus.NOT_FOUND, "roomError", "Room not found.");
+    }
+    
+    const statusType = isActive === "true" ? "activated" : "deactivated";
+    const result = await Room.findByIdAndUpdate(
+      roomId,
+      {
+        isActive,
+        $push: {
+          eventsHistory: logEvent(statusType, user.faculty, `Room ${statusType}`),
+        },
+      },
+      { new: true }
     );
+   
+    return result;
+  } catch (error) {
+    throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, "roomError", "Failed to update room status.");
   }
-  const result = await Room.findByIdAndUpdate(
-    roomId,
-    { isActive: isActive },
-    { new: true }
-  );
-  return result;
 };
-const updateRoomApprovedStatusDB = async (
-  user: JwtPayload,
-  categoryId: string
-) => {
-  const isRoomExists = await Room.findById(categoryId);
-  if (!isRoomExists) {
-    throw new AppError(
-      httpStatus.NOT_FOUND,
-      "roomError",
-      "Room details does not exist."
+
+const updateRoomApprovedStatusDB = async (user: JwtPayload, roomId: string) => {
+  try {
+    const room = await Room.findById(roomId);
+    if (!room) {
+      throw new AppError(httpStatus.NOT_FOUND, "roomError", "Room not found.");
+    }
+  
+    const updatedRoom = await Room.findByIdAndUpdate(
+      roomId,
+      {
+        isApproved: true,
+        isActive: true,
+        $push: {
+          eventsHistory: logEvent( "approved", user.faculty, "Room approved"),
+        },
+      },
+      { new: true }
     );
+  
+    return updatedRoom; 
+  } catch (error) {
+    throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, "roomError", "Failed to update approval status.");
   }
-  const result = await Room.findByIdAndUpdate(
-    categoryId,
-    {
-      "approvalDetails.isApproved": true,
-      "approvalDetails.approvedBy": user._id,
-      "approvalDetails.approvedDate": new Date(),
-      isActive: true,
-    },
-    { new: true }
-  );
-  return result;
 };
+
 export const RoomServices = {
   createRoomIntoDB,
   getAllRoomsDB,
@@ -110,5 +179,5 @@ export const RoomServices = {
   deleteSingleImageDB,
   updateRoomIntoDB,
   updateRoomStatusDB,
-  updateRoomApprovedStatusDB
+  updateRoomApprovedStatusDB,
 };

@@ -2,7 +2,27 @@ import { model, Schema, Types } from "mongoose";
 import { TRoom } from "./room.interface";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
-
+const eventHistorySchema = new Schema({
+  eventType: {
+    type: String,
+    enum: ["created","updated", "approved","activated","deactivated","distributed"],
+    default: "pending",
+  },
+  
+  performedBy: {
+    type: Types.ObjectId,
+    ref: "Faculty",
+  },
+  performedAt: {
+    type: Date,
+    required: true,
+    default: Date.now,
+  },
+  comments: {
+    type: String,
+  },
+  
+});
 const roomSchema = new Schema<TRoom>(
   {
     roomNo: {
@@ -18,6 +38,8 @@ const roomSchema = new Schema<TRoom>(
     floor: {
       type: String,
       required: true,
+      trim: true,
+      uppercase:true
       
     },
     roomType: {
@@ -48,14 +70,19 @@ const roomSchema = new Schema<TRoom>(
     images: {
       type: [String],
     },
+    department: {
+      type: String,
+      default: "Computer Science and Engineering",
+    },
+    assignedRoom:{
+      type:Schema.ObjectId,
+      ref:"Faculty"
+    },
     description: {
       type: String,
       maxlength: 500,
     },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
+  
     features: {
       type: [String],
       enum: [
@@ -72,48 +99,24 @@ const roomSchema = new Schema<TRoom>(
       ],
       default: [],
     },
-    equipment: {
-      type: [
-        {
-          accessories: [
-            {
-              accessory: {
-                type: Schema.Types.ObjectId,
-                ref: "Accessory",
-              },
-              quantity: { type: Number },
-              codes: { type: [String] },
-            },
-          ],
-          totalQuantity: {
-            type: Number,
-            default: 0,
-          },
-        },
-      ],
-      default: [],
+    distributedAccessoriesDetails:{
+      type:[Types.ObjectId],
+      ref:"Accessory"
     },
-    department: {
-      type: String,
-      default: "Computer Science and Engineering",
+    
+    isActive: {
+      type: Boolean,
+      default: false,
     },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
+    isApproved: {
+      type: Boolean,
+      default: false,
     },
-    approvalDetails: {
-      isApproved: {
-        type: Boolean,
-        default: false,
-      },
-      approvedBy: {
-        type: Schema.Types.ObjectId,
-        ref: "User",
-      },
-      approvedDate: {
-        type: Date,
-      },
+    isDeleted: {
+      type: Boolean,
+      default: false,
     },
+    eventsHistory:[eventHistorySchema]
   },
   { timestamps: true }
 );

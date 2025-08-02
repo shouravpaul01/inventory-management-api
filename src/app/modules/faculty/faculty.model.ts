@@ -1,6 +1,26 @@
-import { Schema, model } from "mongoose";
+import { Schema, Types, model } from "mongoose";
 import { TFaculty, TPublication } from "./faculty.interface";
-
+const eventHistorySchema = new Schema({
+  eventType: {
+    type: String,
+    enum: ["created","updated", "approved","blocked","unblocked"],
+    default: "pending",
+  },
+  
+  performedBy: {
+    type: Types.ObjectId,
+    ref: "User",
+  },
+  performedAt: {
+    type: Date,
+    required: true,
+    default: Date.now,
+  },
+  comments: {
+    type: String,
+  },
+  
+});
 const publicationSchema = new Schema<TPublication>({
   title: { type: String },
   journal: { type: String },
@@ -22,6 +42,10 @@ const facultySchema = new Schema<TFaculty>({
   researchInterests: { type: [String] },
   coursesTaught: { type: [String] },
   publications: [publicationSchema],
+  
+    isBlocked: { type: Boolean, default: false },
+    isDeleted: { type: Boolean, default: false },
+    eventshistory:[eventHistorySchema],
 });
 
 export const Faculty = model<TFaculty>("Faculty", facultySchema);

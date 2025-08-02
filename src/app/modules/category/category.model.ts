@@ -1,6 +1,26 @@
-import { model, Schema } from "mongoose";
+import { model, Schema, Types } from "mongoose";
 import { CategoryModel, TCategory } from "./category.interface";
-
+const eventHistorySchema = new Schema({
+  eventType: {
+    type: String,
+    enum: ["created","updated", "approved","activated","deactivated"],
+    default: "pending",
+  },
+  
+  performedBy: {
+    type: Types.ObjectId,
+    ref: "User",
+  },
+  performedAt: {
+    type: Date,
+    required: true,
+    default: Date.now,
+  },
+  comments: {
+    type: String,
+  },
+  
+});
 const categorySchema = new Schema<TCategory, CategoryModel>(
   {
     name: {
@@ -15,21 +35,17 @@ const categorySchema = new Schema<TCategory, CategoryModel>(
     },
     isActive: {
       type: Boolean,
-      default: false,
+      default: true,
     },
-    approvalDetails: {
-      isApproved: {
-        type: Boolean,
-        default: false,
-      },
-      approvedBy: {
-        type: Schema.Types.ObjectId,
-        ref: "User",
-      },
-      approvedDate: {
-        type: Date,
-      },
+    isApproved: {
+      type: Boolean,
+      default: true,
     },
+    isDeleted: {
+      type: Boolean,
+      default: true,
+    },
+    eventsHistory:[eventHistorySchema]
   },
   {
     timestamps: true,

@@ -45,6 +45,7 @@ const loginDB = async (payload: TLogin) => {
   }
   const jwtPayload = {
     _id: isUserExists._id,
+    faculty:(isUserExists.faculty as TFaculty)._id,
     name: (isUserExists.faculty as TFaculty).name,
     profileImage: (isUserExists.faculty as TFaculty).image || null,
     userId: isUserExists.userId,

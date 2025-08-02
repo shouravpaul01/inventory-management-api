@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { TFaculty } from "../faculty/faculty.interface";
 import { Faculty } from "../faculty/faculty.model";
 import { TUser } from "./user.interface";
@@ -7,15 +7,27 @@ import { generateFacultyId } from "./user.utils";
 import AppError from "../../errors/AppError";
 import httpStatus from "http-status";
 import { QueryBuilder } from "../../builder/QueryBuilder";
-import { match } from "assert";
-
-const createfacultyDB = async (payload: TFaculty) => {
-  const userData: Partial<TUser> = {};
+import { JwtPayload } from "jsonwebtoken";
+const logEvent = (
+  type: "created" | "updated" |  "approved" | "blocked" | "unblocked"  ,
+  performedBy?: Types.ObjectId,
+  comments?: string
+) => ({
+  eventType: type,
+  performedBy,
+  performedAt: new Date(),
+  comments,
+});
+const createfacultyDB = async (payload: TFaculty,user: JwtPayload,) => {
+  const userData: Partial<TUser> = {
+  };
 
   payload.userId = await generateFacultyId();
   userData.email = payload.email;
 
   userData.password = payload.email;
+  userData.eventshistory=[logEvent("created",user.faculty,"User Created")]
+  payload.eventshistory=[logEvent("created",user.faculty,"Faculty Created")]
 
   const session = await mongoose.startSession();
 
@@ -139,11 +151,63 @@ const updateUserRoleDB = async (userId: string, role: string) => {
   );
   return result;
 };
+
+const updateUserApprovedStatusDB = async (
+  user: JwtPayload,
+  userId: string
+) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const isUserExists = await User.findOne({ userId }).session(session);
+    if (!isUserExists) {
+      throw new AppError(
+        httpStatus.NOT_FOUND,
+        "userError",
+        "User does not exist."
+      );
+    }
+
+    const approvalData = {
+      "approvalDetails.isApproved": true,
+      "approvalDetails.approvedBy": user._id,
+      "approvalDetails.approvedDate": new Date(),
+      isBlocked: false,
+    };
+
+    const updatedUser = await User.findOneAndUpdate(
+      { userId },
+      approvalData,
+      { new: true, session }
+    );
+
+    await Faculty.findOneAndUpdate(
+      { userId },
+      approvalData,
+      { new: true, session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return updatedUser;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw new AppError(httpStatus.NOT_FOUND,"userError", "User does not exist.");
+  }
+};
 const updateUserBlockedStatusDB = async (userId: string, isBlocked: string) => {
   if (!(await User.isUserExists(userId))) {
     throw new AppError(httpStatus.NOT_FOUND, "isBlocked", "Faculty member does not exist.");
   }
   const result = await User.findOneAndUpdate(
+    { userId },
+    { isBlocked },
+    { new: true }
+  );
+   await Faculty.findOneAndUpdate(
     { userId },
     { isBlocked },
     { new: true }
@@ -182,6 +246,7 @@ export const UserServices = {
   getSingleUserDB,
   updateUserDB,
   updateUserRoleDB,
+  updateUserApprovedStatusDB,
   updateUserBlockedStatusDB,
   deleteUserDB,
   restoreUserDB,

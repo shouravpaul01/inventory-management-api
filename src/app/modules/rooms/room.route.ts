@@ -12,15 +12,16 @@ const router = express.Router();
 router.post(
   "/create-room",
   auth(USER_ROLE.Admin,USER_ROLE.Faculty),
-  upload.array("images", 3),
-  parseData,
   RoomControllers.createRoomInto
 );
 router.get('/',RoomControllers.getAllRooms)
 router.get('/single-room/:roomId',RoomControllers.getSingleRoom)
-router.patch('/update-room/:roomId',RoomControllers.updateRoomInto)
-router.patch('/update-active-status/:roomId',RoomControllers.updateRoomStatus)
+router.delete('/delete-image/:roomId',RoomControllers.deleteSingleImage)
+router.patch('/update-room/:roomId', auth(USER_ROLE.Admin,USER_ROLE.Faculty),
+upload.array("images", 3),
+parseData,RoomControllers.updateRoomInto)
+router.patch('/update-active-status/:roomId', auth(USER_ROLE.Admin),RoomControllers.updateRoomStatus)
 router.patch('/update-approved-status/:roomId',auth(USER_ROLE.Admin),RoomControllers.updateRoomApprovedStatus)
-// router.get("/categories-with-subcategories",CategoryControllers.getCategoriesWithSubCategories)
+
 
 export const RoomRoutes = router;

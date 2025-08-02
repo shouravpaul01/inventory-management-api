@@ -1,9 +1,28 @@
-import  { Schema, model } from "mongoose";
+import  { Schema, Types, model } from "mongoose";
 import { TUser, UserModel } from "./user.interface";
 import bcrypt from "bcrypt";
 import config from "../../config";
-import { number } from "zod";
-
+const eventHistorySchema = new Schema({
+  eventType: {
+    type: String,
+    enum: ["created","updated", "approved","blocked","unblocked","passwordChanged"],
+    default: "pending",
+  },
+  
+  performedBy: {
+    type: Types.ObjectId,
+    ref: "User",
+  },
+  performedAt: {
+    type: Date,
+    required: true,
+    default: Date.now,
+  },
+  comments: {
+    type: String,
+  },
+  
+});
 const userSchema = new Schema<TUser,UserModel>(
   {
     userId: { type: String, required: true, unique: true },
@@ -21,9 +40,11 @@ const userSchema = new Schema<TUser,UserModel>(
     userAccess: {
       type: [String],
     },
-    isApproved: { type: Boolean, default: false },
+    
     isBlocked: { type: Boolean, default: false },
+    isApproved: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
+    eventshistory:[eventHistorySchema],
   },
   {
     timestamps: true,

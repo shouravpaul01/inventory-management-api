@@ -5,7 +5,7 @@ import sendResponse from "../../utils/sendResponse";
 import { CategoryServices } from "./category.service";
 
 const createCategoryInto = catchAsync(async (req, res) => {
-    const result = await CategoryServices.createCategoryIntoDB(req.body);
+    const result = await CategoryServices.createCategoryIntoDB(req.body,req.user);
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
@@ -36,7 +36,7 @@ const createCategoryInto = catchAsync(async (req, res) => {
   const updateCategoryInto = catchAsync(async (req, res) => {
     const { categoryId } = req.params;
    
-    const result = await CategoryServices.updateCategoryIntoDB(categoryId, req.body);
+    const result = await CategoryServices.updateCategoryIntoDB(categoryId, req.body,req.user);
     sendResponse(res, {
       statusCode: httpStatus.OK,
       success: true,
@@ -49,7 +49,8 @@ const createCategoryInto = catchAsync(async (req, res) => {
     const { isActive } = req.query;
     const result = await CategoryServices.updateCategoryStatusDB(
       categoryId,
-      isActive as unknown as boolean
+      isActive as unknown as boolean,
+      req.user
     );
     sendResponse(res, {
       statusCode: httpStatus.OK,

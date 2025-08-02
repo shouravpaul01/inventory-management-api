@@ -55,6 +55,19 @@ const updateUserRole = catchAsync(async (req, res) => {
     data: result,
   });
 });
+const updateUserApprovedStatus = catchAsync(async (req, res) => {
+  const { userId } = req.params;
+
+  const result = await UserServices.updateUserApprovedStatusDB(req.user,
+    userId,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User approval successful.",
+    data: result,
+  });
+});
 const updateUserBlockedStatus = catchAsync(async (req, res) => {
   const { userId } = req.params;
   const { isBlocked } = req.query;
@@ -97,6 +110,7 @@ export const UserControllers = {
   getSingleUser,
   updateUser,
   updateUserRole,
+  updateUserApprovedStatus,
   updateUserBlockedStatus,
   deleteUser,
   restoreUser

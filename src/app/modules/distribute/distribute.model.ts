@@ -104,21 +104,12 @@ const distributeSchema = new Schema<TDistribute | undefined>(
     distributedTo: {
       locationType: {
         type: String,
-        enum: [
-          "classroom",
-          "office",
-          "lab",
-          "storage",
-          "event_venue",
-          "library",
-          "canteen",
-          "other",
-        ],
+     
         required: true,
       },
-      user: {
+      facultyMember: {
         type: Types.ObjectId,
-        ref: "User",
+        ref: "Faculty",
       },
       department: {
         type: String,
