@@ -25,7 +25,7 @@ const createCategoryIntoDB = async (payload: TCategory, user: JwtPayload) => {
       "Name already exists."
     );
   }
-  payload.eventsHistory = [logEvent("created", user._id, "Category created")];
+  payload.eventsHistory = [logEvent("created", user.faculty, "Category created")];
   const result = await Category.create(payload);
   return result;
 };
@@ -69,38 +69,51 @@ const updateCategoryIntoDB = async (
 };
 const updateCategoryStatusDB = async (
   categoryId: string,
-  isActive: boolean,
+  isActive: string,
   user: JwtPayload
 ) => {
-  const isCategoryExists = await Category.findById(categoryId);
-  if (!isCategoryExists) {
+  try {
+    const isCategoryExists = await Category.findById(categoryId);
+
+    if (!isCategoryExists) {
+      throw new AppError(
+        httpStatus.NOT_FOUND,
+        "categoryError",
+        "Category does not exist."
+      );
+    }
+
+    const statusType = isActive === "true" ? "activated" : "deactivated";
+    const activeStatus = isActive === "true";
+
+    const result = await Category.findByIdAndUpdate(
+      categoryId,
+      {
+        isActive: activeStatus,
+        $push: {
+          eventsHistory: logEvent(statusType, user.faculty, `Category ${statusType}`),
+        },
+      },
+      { new: true }
+    );
+
+    return result;
+  } catch (error) {
+    
     throw new AppError(
-      httpStatus.NOT_FOUND,
+      httpStatus.INTERNAL_SERVER_ERROR,
       "categoryError",
-      "Category does not exist."
+      "Failed to update category status."
     );
   }
-  
-  
-  const statusType = isActive ? "activated" : "deactivated";
-
-  const result = await Category.findByIdAndUpdate(
-    categoryId,
-    {
-      isActive,
-      $push: {
-        eventsHistory: logEvent(statusType,user.faculty, `Room ${statusType}`),
-      },
-    },
-    { new: true }
-  );
-  return result;
 };
+
 const updateCategoryApprovedStatusDB = async (
   user: JwtPayload,
   categoryId: string
 ) => {
-  const isCategoryExists = await Category.findById(categoryId);
+  try {
+    const isCategoryExists = await Category.findById(categoryId);
   if (!isCategoryExists) {
     throw new AppError(
       httpStatus.NOT_FOUND,
@@ -119,6 +132,14 @@ const updateCategoryApprovedStatusDB = async (
     { new: true }
   );
   return result;
+  } catch (error) {
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "categoryError",
+      "Failed to update approval status."
+    );
+  
+  }
 };
 
 const getCategoriesWithSubCategoriesDB = async () => {

@@ -49,7 +49,7 @@ const createCategoryInto = catchAsync(async (req, res) => {
     const { isActive } = req.query;
     const result = await CategoryServices.updateCategoryStatusDB(
       categoryId,
-      isActive as unknown as boolean,
+      isActive as string,
       req.user
     );
     sendResponse(res, {

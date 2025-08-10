@@ -63,7 +63,7 @@ const updateRoomStatus = catchAsync(async (req, res) => {
   const { isActive } = req.query;
   const result = await RoomServices.updateRoomStatusDB(
     roomId,
-    isActive as unknown as boolean,
+    isActive as string,
     req.user
   );
   sendResponse(res, {

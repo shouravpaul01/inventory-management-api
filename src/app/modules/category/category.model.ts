@@ -4,12 +4,12 @@ const eventHistorySchema = new Schema({
   eventType: {
     type: String,
     enum: ["created","updated", "approved","activated","deactivated"],
-    default: "pending",
+   
   },
   
   performedBy: {
     type: Types.ObjectId,
-    ref: "User",
+    ref: "Faculty",
   },
   performedAt: {
     type: Date,
@@ -35,15 +35,15 @@ const categorySchema = new Schema<TCategory, CategoryModel>(
     },
     isActive: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     isApproved: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     isDeleted: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     eventsHistory:[eventHistorySchema]
   },

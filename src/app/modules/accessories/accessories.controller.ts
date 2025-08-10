@@ -6,7 +6,8 @@ import { AccessoryServices } from "./accessories.service";
 const createAccessoryInto = catchAsync(async (req, res) => {
   const result = await AccessoryServices.createAccessoryIntoDB(
     (req as any).file,
-    req.body
+    req.body,
+    req.user
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -40,7 +41,8 @@ const updateAccessory = catchAsync(async (req, res) => {
   const result = await AccessoryServices.updateAccessoryDB(
     accessoryId,
     (req as any).file,
-    req.body
+    req.body,
+    req.user
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -55,7 +57,8 @@ const updateAccessoryStatus = catchAsync(async (req, res) => {
   const { isActive } = req.query;
   const result = await AccessoryServices.updateAccessoryStatusDB(
     accessoryId,
-    isActive as unknown as boolean
+    isActive as string,
+    req.user
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -81,6 +84,17 @@ const updateAccessoryApprovedStatus = catchAsync(async (req, res) => {
     data: result,
   });
 });
+const deleteSingleImage = catchAsync(async (req, res) => {
+  const { accessoryId } = req.params;
+  const { imageUrl } = req.query;
+  const result = await AccessoryServices.deleteSingleImageDB(accessoryId,imageUrl as string);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Successfully Image deleted.",
+    data: result,
+  });
+});
 export const AccessoryControllers = {
   createAccessoryInto,
   getAllAccessories,
@@ -89,4 +103,5 @@ export const AccessoryControllers = {
   
   updateAccessoryStatus,
   updateAccessoryApprovedStatus,
+  deleteSingleImage
 };

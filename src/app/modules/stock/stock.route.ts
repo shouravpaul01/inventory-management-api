@@ -2,15 +2,18 @@ import express from "express";
 import { StockController } from "./stock.controller";
 import { validateRequest } from "../../middlewares/validateRequest";
 import { updateStockQuantityValidation } from "./stock.validation";
-import { upload } from "../../config/multer.config";
+import { upload, uploadMultipleImages, uploadImagesByFields } from "../../config/multer.config";
 import parseData from "../../middlewares/parseData";
 import auth from "../../middlewares/auth";
 import { USER_ROLE } from "../user/user.constent";
+import type { RequestHandler } from "express";
 const router = express.Router();
+
+
 
 router.post(
   "/create-stock/:stockId",
-  upload.array("images"),
+  uploadImagesByFields([{ name: "documentImages", maxCount: 3 },{ name: "locatedImages", maxCount: 3 }]) as RequestHandler,
   parseData,
   validateRequest(updateStockQuantityValidation),
   StockController.createStock
@@ -25,7 +28,10 @@ router.get("/single-stock", StockController.getSingleStock),
   router.patch(
     "/update-stock",
     auth(USER_ROLE.Admin),
-    upload.array("images"),
+    uploadImagesByFields([
+      { name: "documentImages", maxCount: 3 },
+      { name: "locatedImages", maxCount: 3 },
+    ]) as RequestHandler,
     parseData,
     validateRequest(updateStockQuantityValidation),
     StockController.updateStock

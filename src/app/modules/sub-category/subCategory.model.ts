@@ -1,7 +1,29 @@
 import { model, Schema } from "mongoose";
 import { SubCatModel, TSubCategory } from "./subCategory.interface";
 
-const categorySchema = new Schema<TSubCategory, SubCatModel>(
+import { Types } from "mongoose";
+const eventHistorySchema = new Schema({
+  eventType: {
+    type: String,
+    enum: ["created","updated", "approved","activated","deactivated"],
+    default: "pending",
+  },
+  
+  performedBy: {
+    type: Types.ObjectId,
+    ref: "Faculty",
+  },
+  performedAt: {
+    type: Date,
+    required: true,
+    default: Date.now,
+  },
+  comments: {
+    type: String,
+  },
+  
+});
+const subCategorySchema = new Schema<TSubCategory, SubCatModel>(
   {
     name: {
       type: String,
@@ -22,30 +44,26 @@ const categorySchema = new Schema<TSubCategory, SubCatModel>(
       type: Boolean,
       default: false,
     },
-    approvalDetails: {
-      isApproved: {
-        type: Boolean,
-        default: false,
-      },
-      approvedBy: {
-        type: Schema.Types.ObjectId,
-        ref: "User",
-      },
-      approvedDate: {
-        type: Date,
-      },
+    isApproved: {
+      type: Boolean,
+      default: false,
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    eventsHistory:[eventHistorySchema]
   },
   {
     timestamps: true,
   }
 );
-categorySchema.statics.isSubCatNameExists = async function isSubCatNameExists(
+subCategorySchema.statics.isSubCatNameExists = async function isSubCatNameExists(
   name: string
 ) {
   return await this.findOne({ name: name });
 };
 export const SubCategory = model<TSubCategory, SubCatModel>(
   "SubCategory",
-  categorySchema
+  subCategorySchema
 );

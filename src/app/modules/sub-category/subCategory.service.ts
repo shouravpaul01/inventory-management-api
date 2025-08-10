@@ -6,7 +6,21 @@ import AppError from "../../errors/AppError";
 import { JwtPayload } from "jsonwebtoken";
 
 
-const createSubCategoryIntoDB = async (payload: TSubCategory) => {
+const logEvent = (
+  eventType: string,
+  performedBy: string,
+  comments?: string
+) => ({
+  eventType,
+  performedBy,
+  comments,
+  performedAt: new Date(),
+});
+
+const createSubCategoryIntoDB = async (
+  payload: TSubCategory,
+  user: JwtPayload
+) => {
   if (await SubCategory.isSubCatNameExists(payload.name)) {
     throw new AppError(
       httpStatus.UNPROCESSABLE_ENTITY,
@@ -14,71 +28,139 @@ const createSubCategoryIntoDB = async (payload: TSubCategory) => {
       "Name already exists."
     );
   }
- 
-  const result = await SubCategory.create(payload);
+
+  const result = await SubCategory.create({
+    ...payload,
+    eventsHistory: [
+      logEvent("created", user.faculty, "Sub-category created"),
+    ],
+  });
   return result;
 };
+
 const getAllSubCategoriesDB = async (query: Record<string, unknown>) => {
- 
-  const searchableFields = ["name", ];
+  const searchableFields = ["name"];
   const mainQuery = new QueryBuilder(
     SubCategory.find({}).populate("category"),
     query
-  ).filter().search(searchableFields);
+  )
+    .filter()
+    .search(searchableFields);
 
   const totalPages = (await mainQuery.totalPages()).totalQuery;
   const subCategoryQuery = mainQuery.paginate();
   const subCategories = await subCategoryQuery.modelQuery;
 
-  const result = { data: subCategories, totalPages: totalPages };
-  return result;
+  return { data: subCategories, totalPages };
 };
+
 const getSingleSubCategoryDB = async (subCategoryId: string) => {
-  const result = await SubCategory.findById(subCategoryId).populate("category");
+  const result = await SubCategory.findById(subCategoryId).populate("category").populate("eventsHistory.performedBy");
+  if (!result) {
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      "subCategoryError",
+      "Sub Category not found."
+    );
+  }
   return result;
 };
+
 const updateSubCategoryIntoDB = async (
   subCategoryId: string,
-  payload: Partial<TSubCategory>
+  payload: Partial<TSubCategory>,
+  user: JwtPayload
 ) => {
-  const result = await SubCategory.findByIdAndUpdate(subCategoryId, payload, {
-    new: true,
-  });
-  return result;
-};
-const updateSubCategoryStatusDB = async (
-  subCategoryId: string,
-  isActive: boolean
-) => {
-
-  const result = await SubCategory.findByIdAndUpdate(
-    subCategoryId,
-    { isActive: isActive },
-    { new: true }
-  );
-  return result;
-};
-const updateSubCategoryApprovedStatusDB = async ( user: JwtPayload,subCategoryId: string) => {
-  const isCategoryExists=await SubCategory.findById(subCategoryId)
-  if (!isCategoryExists) {
-    throw new AppError(httpStatus.NOT_FOUND,"subCategoryError","Sub Category does not exist.")
-  }
   const result = await SubCategory.findByIdAndUpdate(
     subCategoryId,
     {
-      "approvalDetails.isApproved": true,
-      "approvalDetails.approvedBy": user._id,
-      "approvalDetails.approvedDate": new Date(),
-      isActive: true,
+      ...payload,
+      $push: {
+        eventsHistory: logEvent("updated", user.faculty, "Sub-category updated"),
+      },
     },
     { new: true }
   );
   return result;
 };
-const getAllActiveSubCategoriesByCategoryDB = async (categoryId:string) => {
-  const result = await SubCategory.find({category:categoryId, isActive: true,"approvalDetails.isApproved":true });
+
+const updateSubCategoryStatusDB = async (
+  subCategoryId: string,
+  isActive: string,
+  user: JwtPayload
+) => {
+  try {
+    const statusType = isActive=="true" ? "activated" : "deactivated";
+
+  const result = await SubCategory.findByIdAndUpdate(
+    subCategoryId,
+    {
+      isActive,
+      $push: {
+        eventsHistory: logEvent(statusType, user.faculty, `Sub-category ${statusType}`),
+      },
+    },
+    { new: true }
+  );
+
+
+
+  return result;
+  } catch (error) {
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "subCategoryError",
+      "Failed to update status."
+    );
+  }
+};
+
+const updateSubCategoryApprovedStatusDB = async (
+  user: JwtPayload,
+  subCategoryId: string
+) => {
+ try {
+  const subCat = await SubCategory.findById(subCategoryId);
+  if (!subCat) {
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      "subCategoryError",
+      "Sub Category does not exist."
+    );
+  }
+
+  const result = await SubCategory.findByIdAndUpdate(
+    subCategoryId,
+    {
+      isApproved: true,
+      isActive: true,
+      $push: {
+        eventsHistory: logEvent("approved", user.faculty, "Sub-category approved"),
+      },
+    },
+    { new: true }
+  );
+
+  return result;
+ } catch (error) {
+  throw new AppError(
+    httpStatus.INTERNAL_SERVER_ERROR,
+    "subCategoryError",
+    "Failed to update approval status."
+  );
+ }
+};
+
+const getAllActiveSubCategoriesByCategoryDB = async (categoryId: string) => {
+  const result = await SubCategory.find({
+    category: categoryId,
+    isActive: true,
+    isApproved: true,
+  });
+
   return result;
 };
+
 export const SubCatServices = {
   createSubCategoryIntoDB,
   getAllSubCategoriesDB,

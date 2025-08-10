@@ -4,7 +4,7 @@ import { SubCatServices } from "./subCategory.service";
 import sendResponse from "../../utils/sendResponse";
 
 const createSubCategoryInto = catchAsync(async (req, res) => {
-  const result = await SubCatServices.createSubCategoryIntoDB(req.body);
+  const result = await SubCatServices.createSubCategoryIntoDB(req.body,req.user);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -35,7 +35,8 @@ const updateSubCategoryInto = catchAsync(async (req, res) => {
   const { subCategoryId } = req.params;
   const result = await SubCatServices.updateSubCategoryIntoDB(
     subCategoryId,
-    req.body
+    req.body,
+    req.user
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -50,7 +51,8 @@ const updateSubCategoryStatus = catchAsync(async (req, res) => {
   console.log(subCategoryId)
   const result = await SubCatServices.updateSubCategoryStatusDB(
     subCategoryId,
-    isActive as unknown as boolean
+    isActive as string,
+    req.user
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

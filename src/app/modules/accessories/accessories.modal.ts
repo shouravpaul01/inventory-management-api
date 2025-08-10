@@ -1,6 +1,26 @@
-import { model, Schema } from "mongoose";
+import { model, Schema, Types } from "mongoose";
 import { TAccessory } from "./accessories.interface";
-
+const eventHistorySchema = new Schema({
+  eventType: {
+    type: String,
+    enum: ["created","updated", "approved","activated","deactivated","New Stock"],
+    
+  },
+  
+  performedBy: {
+    type: Types.ObjectId,
+    ref: "Faculty",
+  },
+  performedAt: {
+    type: Date,
+    required: true,
+    default: Date.now,
+  },
+  comments: {
+    type: String,
+  },
+  
+});
 const accessorySchema = new Schema<TAccessory>({
   name: { type: String, required: true },
   category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
@@ -38,20 +58,9 @@ const accessorySchema = new Schema<TAccessory>({
     default: "Available",
   },
   isActive: { type: Boolean, default: false },
-  approvalDetails: {
-    isApproved: {
-      type: Boolean,
-      default: false,
-    },
-    approvedBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-    },
-    approvedDate: {
-      type: Date,
-    },
-  },
+  isApproved:{ type: Boolean, default: false },
   isDeleted: { type: Boolean, default: false },
+  eventsHistory:[eventHistorySchema]
 });
 
 export const Accessory = model<TAccessory>("Accessory", accessorySchema);

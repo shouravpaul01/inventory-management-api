@@ -1,6 +1,6 @@
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
-import { TStock, TStockDetail } from "./stock.interface";
+import { TStockDetail } from "./stock.interface";
 import { Stock } from "./stock.model";
 import { Accessory } from "../accessories/accessories.modal";
 import { generateAccessoriesCode } from "../accessories/accessories.utils";
@@ -8,50 +8,107 @@ import { JwtPayload } from "jsonwebtoken";
 import { deleteFileFromCloudinary } from "../../utils/deleteFileFromCloudinary";
 import { Types } from "mongoose";
 
+const logEvent = (
+  type: "created" | "updated" | "approved" | "activated" | "deactivated",
+  performedBy: Types.ObjectId,
+  comments?: string
+) => ({
+  eventType: type,
+  performedBy,
+  performedAt: new Date(),
+  comments,
+});
+
 const createStockDB = async (
   stockId: string,
-  files: any,
-  payload: Partial<TStock> & {
-    quantity: number;
-    images: string[];
-    description: string;
-    accessoryCodes: string[];
-  }
+  user: JwtPayload,
+  files: Record<string, { path: string }[]> | any,
+  payload: Partial<TStockDetail> & { quantity: number }
 ) => {
-  const isExistsStock = await Stock.findById(stockId);
+  const session = await Stock.startSession();
+  try {
+    session.startTransaction();
 
-  const isExistsAccessory = await Accessory.findOne({ stock: stockId });
-  if (!isExistsStock) {
-    throw new AppError(
-      httpStatus.NOT_FOUND,
-      "stockError",
-      "Failed to update stock."
+    const isExistsStock = await Stock.findById(stockId).session(session);
+    const isExistsAccessory = await Accessory.findOne({ stock: stockId }).session(session);
+
+    if (!isExistsStock && !isExistsAccessory) {
+      throw new AppError(
+        httpStatus.NOT_FOUND,
+        "stockError",
+        "Failed to update stock."
+      );
+    }
+
+    // Map uploaded files into model fields
+    if (files && typeof files === "object") {
+      if (Array.isArray(files.documentImages) && files.documentImages.length > 0) {
+        payload.documentImages = files.documentImages.map((file: any) => file.path);
+      }
+      if (Array.isArray(files.locatedImages) && files.locatedImages.length > 0) {
+        payload.locatedDetails = payload.locatedDetails || ({} as any);
+        (payload.locatedDetails as any).locatedImages = files.locatedImages.map(
+          (file: any) => file.path
+        );
+      }
+    }
+
+    if (isExistsAccessory?.isItReturnable) {
+      const codes = await generateAccessoriesCode({
+        totalQuantity: isExistsAccessory?.quantityDetails?.totalQuantity,
+        quantity: payload.quantity,
+        codeTitle: isExistsAccessory?.codeTitle as string,
+      });
+      payload.accessoryCodes = codes;
+    }
+
+    payload.eventsHistory = [
+      logEvent(
+        "created",
+        new Types.ObjectId(String((user as any)?._id || (user as any)?.userId)),
+        "Stock detail created"
+      ),
+    ];
+
+    const result = await Stock.findByIdAndUpdate(
+      stockId,
+      { $push: { details: payload } },
+      { new: true, session }
     );
-  }
-  if (Array.isArray(files) && files.length > 0) {
-    payload.images = files.map((file) => file.path);
-  }
 
-  const result = await Stock.findByIdAndUpdate(
-    stockId,
-    { $push: { details: payload } },
-    { new: true }
-  );
-  return result;
+    await Accessory.findOneAndUpdate(
+      { stock: stockId },
+      {
+        $push: {
+          eventsHistory: logEvent(
+            "created",
+            new Types.ObjectId(String((user as any)?._id || (user as any)?.userId)),
+            "Stock detail created"
+          ),
+        },
+      },
+      { new: true, session }
+    );
+
+    await session.commitTransaction();
+    return result;
+  } catch (error) {
+    await session.abortTransaction();
+    throw new AppError(httpStatus.BAD_REQUEST,"stockError","Stock Creation failed.Pls try again.");
+  } finally {
+    session.endSession();
+  }
 };
 
 const getAllStocksDB = async (query: Record<string, unknown>) => {
   console.log(query, "query");
   const detailConditions: any[] = [];
-  const page = parseInt(query.page as string) || 1; // Default start index
+  const page = parseInt(query.page as string) || 1; 
   const limit = parseInt(query.limit as string) || 5;
   // Add approvalStatus condition if provided
   if (query?.approvalStatus !== undefined) {
     detailConditions.push({
-      $eq: [
-        "$$detail.approvalDetails.isApproved",
-        JSON.parse(query?.approvalStatus as string),
-      ],
+      $eq: ["$$detail.isApproved", JSON.parse(query?.approvalStatus as string)],
     });
   }
 
@@ -98,74 +155,86 @@ const updateStockApprovedStatusDB = async (
   stockId: string,
   stockDetailsId: string
 ) => {
- 
-  // Check if Stock exists
-  const isStockExists = await Stock.findOne(
-    { _id: stockId, "details._id": stockDetailsId },
-    {
-      "details.$": 1,
-      quantityDetails: 1,
-      codeDetails: 1,
+  const session = await Stock.startSession();
+  try {
+    session.startTransaction();
+
+    const isStockExists = await Stock.findOne(
+      { _id: stockId, "details._id": stockDetailsId },
+      { "details.$": 1 }
+    ).session(session);
+    if (!isStockExists) {
+      throw new AppError(
+        httpStatus.NOT_FOUND,
+        "stockError",
+        "Stock doesn't exist."
+      );
     }
-  );
-  if (!isStockExists) {
-    throw new AppError(
-      httpStatus.NOT_FOUND,
-      "stockError",
-      "Stock doesn't exist."
-    );
-  }
-  const isExistsAccessory = await Accessory.findOne({ stock: stockId });
-  if (!isExistsAccessory) {
-    throw new AppError(
-      httpStatus.NOT_FOUND,
-      "stockError",
-      "Stock doesn't exist."
-    );
-  }
-  let codes: any = [];
-  if (isExistsAccessory.isItReturnable) {
-    const generateCodes = await generateAccessoriesCode({
-      totalQuantity: isExistsAccessory.quantityDetails.totalQuantity,
-      quantity: isStockExists.details[0].quantity,
-      codeTitle: isExistsAccessory?.codeTitle as string,
-    });
-    codes = generateCodes;
-  }
 
-  const updateAccessoryData = {
-    quantityDetails: {
-      totalQuantity:
-        isExistsAccessory.quantityDetails.totalQuantity +
-        isStockExists.details[0].quantity,
-      currentQuantity:
-        isExistsAccessory.quantityDetails.currentQuantity +
-        isStockExists.details[0].quantity,
-    },
+    const isExistsAccessory = await Accessory.findOne({ stock: stockId }).session(session);
+    if (!isExistsAccessory) {
+      throw new AppError(
+        httpStatus.NOT_FOUND,
+        "stockError",
+        "Stock doesn't exist."
+      );
+    }
 
-    $push: {
-      "codeDetails.totalCodes": codes,
-      "codeDetails.currentCodes": codes,
-    },
-  };
+    let codes: any = [];
+    if (isExistsAccessory.isItReturnable) {
+      const generateCodes = await generateAccessoriesCode({
+        totalQuantity: isExistsAccessory.quantityDetails.totalQuantity,
+        quantity: isStockExists.details[0].quantity,
+        codeTitle: isExistsAccessory?.codeTitle as string,
+      });
+      codes = generateCodes;
+    }
 
-  await Accessory.findOneAndUpdate({ stock: stockId }, updateAccessoryData, {
-    new: true,
-  });
-  // Update Stock approval details
-  const result = await Stock.findOneAndUpdate(
-    { _id: stockId, "details._id": stockDetailsId },
-    {
-      $set: {
-        "details.$.accessoryCodes": codes,
-        "details.$.approvalDetails.isApproved": true,
-        "details.$.approvalDetails.approvedBy": user._id,
-        "details.$.approvalDetails.approvedDate": new Date(),
+    const updateAccessoryData: any = {
+      quantityDetails: {
+        totalQuantity:
+          isExistsAccessory.quantityDetails.totalQuantity + isStockExists.details[0].quantity,
+        currentQuantity:
+          isExistsAccessory.quantityDetails.currentQuantity + isStockExists.details[0].quantity,
       },
-    },
-    { new: true }
-  );
-  return result;
+      $push: {
+        "codeDetails.totalCodes": codes,
+        "codeDetails.currentCodes": codes,
+      },
+    };
+
+    await Accessory.findOneAndUpdate({ stock: stockId }, updateAccessoryData, {
+      new: true,
+      session,
+    });
+
+    const result = await Stock.findOneAndUpdate(
+      { _id: stockId, "details._id": stockDetailsId },
+      {
+        $set: {
+          "details.$.accessoryCodes": codes,
+          "details.$.isApproved": true,
+          "details.$.isActive": true,
+        },
+        $push: {
+          "details.$.eventsHistory": logEvent(
+            "approved",
+            new Types.ObjectId(String(user._id)),
+            "Stock approved"
+          ),
+        },
+      },
+      { new: true, session }
+    );
+
+    await session.commitTransaction();
+    return result;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
 };
 const getSingleStockDB = async (stockId: string, stockDetailsId: string) => {
   const isStockExists = await Stock.findOne(
@@ -186,7 +255,8 @@ const getSingleStockDB = async (stockId: string, stockDetailsId: string) => {
 const updateStockDB = async (
   stockId: string,
   stockDetailsId: string,
-  files: any,
+  user: JwtPayload,
+  files: Record<string, { path: string }[]> | any,
   payload: Partial<TStockDetail>
 ) => {
   const isStockExists = await Stock.findOne(
@@ -202,21 +272,42 @@ const updateStockDB = async (
       "Stock doesn't exist."
     );
   }
-  if (Array.isArray(files) && files.length > 0) {
-    if (isStockExists?.details[0]?.images.length > 0) {
-      isStockExists?.details[0]?.images?.forEach(
-        async (image) => await deleteFileFromCloudinary(image)
+  // Replace documentImages if new ones uploaded
+  if (files && typeof files === "object") {
+    if (Array.isArray(files.documentImages) && files.documentImages.length > 0) {
+      const prevDocs = (isStockExists.details[0] as any)?.documentImages || [];
+      for (const imagePath of prevDocs) {
+        await deleteFileFromCloudinary(imagePath);
+      }
+      payload.documentImages = files.documentImages.map((file: any) => file.path);
+    }
+    if (Array.isArray(files.locatedImages) && files.locatedImages.length > 0) {
+      const prevLocated =
+        (isStockExists.details[0] as any)?.locatedDetails?.locatedImages || [];
+      for (const imagePath of prevLocated) {
+        await deleteFileFromCloudinary(imagePath);
+      }
+      payload.locatedDetails = payload.locatedDetails || ({} as any);
+      (payload.locatedDetails as any).locatedImages = files.locatedImages.map(
+        (file: any) => file.path
       );
     }
-    payload.images = files.map((file) => file.path);
   }
   const result = await Stock.findOneAndUpdate(
     { _id: stockId, "details._id": stockDetailsId },
     {
       $set: {
         "details.$.quantity": payload.quantity,
-        "details.$.images": payload.images,
+        "details.$.documentImages": payload.documentImages,
+        "details.$.locatedDetails": payload.locatedDetails,
         "details.$.description": payload.description,
+      },
+      $push: {
+        "details.$.eventsHistory": logEvent(
+          "updated",
+          new Types.ObjectId(String(user._id)),
+          "Stock detail updated"
+        ),
       },
     },
     { new: true }

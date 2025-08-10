@@ -1,46 +1,60 @@
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import { TAccessory } from "./accessories.interface";
-import { Accessory } from "./accessories.modal";
+
 import { TFileUpload } from "../../interfaces";
 import {
-  generateAccessoriesCode,
   generateAccessoryCodeTitle,
 } from "./accessories.utils";
 import { QueryBuilder } from "../../builder/QueryBuilder";
 import { deleteFileFromCloudinary } from "../../utils/deleteFileFromCloudinary";
 import { Stock } from "../stock/stock.model";
+import mongoose, { Types } from "mongoose";
 
-import mongoose from "mongoose";
+import { Accessory } from "./accessories.modal";
 import { JwtPayload } from "jsonwebtoken";
+import { Faculty } from "../faculty/faculty.model";
+
+
+const logEvent = (
+  eventType: "created" | "updated" | "approved" | "activated" | "deactivated" | "New Stock",
+  performedBy: Types.ObjectId,
+  comments?: string
+) => ({
+  eventType,
+  performedBy,
+  comments,
+  performedAt: new Date(),
+});
 
 const createAccessoryIntoDB = async (
   file: TFileUpload,
-  payload: TAccessory & { codeTitle: string; quantity: number }
+  payload: TAccessory & { codeTitle: string; quantity: number },
+  user: JwtPayload
 ) => {
   const session = await mongoose.startSession();
-console.log(payload,"pa")
+
   try {
     await session.startTransaction();
 
-    // Check if accessory already exists
     const isAccessoryExists = await Accessory.findOne({
       name: payload.name,
     }).session(session);
+
     if (isAccessoryExists) {
       throw new AppError(httpStatus.CONFLICT, "name", "Name already exists.");
     }
 
-    // Handle file upload (image)
     if (file) {
       payload.image = file.path;
     }
-    if (payload.isItReturnable === "true") {
-      // Generate code title and accessory codes
+
+    if (payload.isItReturnable === true) {
       const generateCode = await generateAccessoryCodeTitle(
         payload.subCategory,
         payload.codeTitle
       );
+
       const isCodeTitleExists = await Accessory.findOne({
         codeTitle: generateCode,
       }).session(session);
@@ -52,63 +66,44 @@ console.log(payload,"pa")
           "Code title already exists."
         );
       }
+
       payload.codeTitle = generateCode;
     }
 
-    const isCreateStockSuccessResult = new Stock();
-    await isCreateStockSuccessResult.save({ session });
-    payload.stock = isCreateStockSuccessResult._id;
-    // Create accessory
-    const isCreateAccessorySuccessResult = await Accessory.create([payload], {
-      session,
-    });
+    const newStock = new Stock();
+    await newStock.save({ session });
+    payload.stock = newStock._id;
+
+   
+    payload.eventsHistory = [
+      logEvent("created", user.faculty,"Accessory created")
+    ];
+
+    const [result] = await Accessory.create([payload], { session });
 
     await session.commitTransaction();
-
-    // Return the created accessory object
-    return isCreateAccessorySuccessResult[0];
+    return result;
   } catch (error: any) {
-    console.log(error, "erore");
-
     await session.abortTransaction();
+
     if (error instanceof AppError && error.isAppError) {
       throw error;
-    } else {
-      throw new AppError(
-        httpStatus.UNPROCESSABLE_ENTITY,
-        "accessoryError",
-        "Accessory creation failed."
-      );
     }
+
+    throw new AppError(
+      httpStatus.UNPROCESSABLE_ENTITY,
+      "accessoryError",
+      "Accessory creation failed.Pls try again."
+    );
   } finally {
     await session.endSession();
   }
 };
 
 const getAllAccessoriesDB = async (query: any) => {
-  const { categories, subCategories, isItReturnable, search } = query;
   const searchableFields = ["name"];
   const filterQuery: any = {};
-  console.log(query, "main");
-  // if (categories) {
-  //   console.log("1")
-  //   filterQuery.category = { $in: categories.split(",") };
-  //   delete query["categories"];
-  // }
 
-  // // filterQuery. by subCategories (array of IDs)
-  // if (subCategories) {
-  //   console.log("2")
-  //   filterQuery.subCategory = { $in: subCategories.split(",") };
-  //   delete query["subCategories"];
-  // }
-
-  // if (isItReturnable !== undefined) {
-  //   console.log("3")
-  //   filterQuery["isItReturnable"] = isItReturnable;
-  // }
-  console.log(filterQuery, "4");
-  // console.log(query, categories.split(","), filterQuery, "accessory");
   const mainQuery = new QueryBuilder(
     Accessory.find(filterQuery)
       .populate("category")
@@ -123,17 +118,31 @@ const getAllAccessoriesDB = async (query: any) => {
   const paginateQuery = mainQuery.paginate();
   const accessories = await paginateQuery.modelQuery;
 
-  const result = { data: accessories, totalPages: totalPages };
-  return result;
+  return { data: accessories, totalPages };
 };
+
 const getSingleAccessoryDB = async (accessoryId: string) => {
-  const result = await Accessory.findById(accessoryId);
+  const result = await Accessory.findById(accessoryId)
+    .populate("category")
+    .populate("subCategory")
+    .populate("stock");
+
+  if (!result) {
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      "accessoryError",
+      "Accessory not found."
+    );
+  }
+
   return result;
 };
+
 const updateAccessoryDB = async (
   accessoryId: string,
   file: TFileUpload,
-  payload: Partial<TAccessory>
+  payload: Partial<TAccessory>,
+  user: JwtPayload
 ) => {
   const isAccessoryExists = await Accessory.findById(accessoryId);
   if (!isAccessoryExists) {
@@ -145,87 +154,43 @@ const updateAccessoryDB = async (
   }
 
   if (file) {
-    isAccessoryExists?.image &&
-      (await deleteFileFromCloudinary(isAccessoryExists?.image!));
+    if (isAccessoryExists.image) {
+      await deleteFileFromCloudinary(isAccessoryExists.image);
+    }
     payload.image = file.path;
   }
-  // Generate a new code title if subCategory or codeTitle is provided
+
   if (payload.subCategory || payload.codeTitle) {
     const generateCode = await generateAccessoryCodeTitle(
-      payload.subCategory!,
-      payload.codeTitle!
+      payload.subCategory || isAccessoryExists.subCategory,
+      payload.codeTitle || isAccessoryExists.codeTitle
     );
 
     if (generateCode !== isAccessoryExists.codeTitle) {
-      // Check if the generated code title already exists in another accessory
       const isCodeTitleExists = await Accessory.findOne({
         codeTitle: generateCode,
-        _id: { $ne: accessoryId }, // Exclude the current accessory
+        _id: { $ne: accessoryId },
       });
 
       if (isCodeTitleExists) {
         throw new AppError(
           httpStatus.CONFLICT,
           "codeTitle",
-          "Code title already exist."
+          "Code title already exists."
         );
       }
+
+      payload.codeTitle = generateCode;
     }
-
-    payload.codeTitle = generateCode;
   }
 
-  console.log("3");
-
-  const result = await Accessory.findByIdAndUpdate(accessoryId, payload, {
-    new: true,
-  });
-
-  return result;
-};
-
-const updateAccessoryStatusDB = async (
-  accessoryId: string,
-  isActive: boolean
-) => {
-  const isAccessoryExists = await Accessory.findById(accessoryId);
-  if (!isAccessoryExists) {
-    throw new AppError(
-      httpStatus.NOT_FOUND,
-      "accessoryError",
-      "Accessory doesn't exist."
-    );
-  }
-  const result = await Accessory.findByIdAndUpdate(
-    accessoryId,
-    { isActive: isActive },
-    { new: true }
-  );
-  return result;
-};
-
-const updateAccessoryApprovedStatusDB = async (
-  user: JwtPayload,
-  accessoryId: string
-) => {
-  // Check if accessory exists
-  const isAccessoryExists = await Accessory.findById(accessoryId);
-  if (!isAccessoryExists) {
-    throw new AppError(
-      httpStatus.NOT_FOUND,
-      "accessoryError",
-      "Accessory doesn't exist."
-    );
-  }
-
-  // Update Accessory approval details
   const result = await Accessory.findByIdAndUpdate(
     accessoryId,
     {
-      "approvalDetails.isApproved": true,
-      "approvalDetails.approvedBy": user._id,
-      "approvalDetails.approvedDate": new Date(),
-      isActive: true,
+      ...payload,
+      $push: {
+        eventsHistory: logEvent("updated", user.faculty, "Accessory updated"),
+      },
     },
     { new: true }
   );
@@ -233,6 +198,98 @@ const updateAccessoryApprovedStatusDB = async (
   return result;
 };
 
+const updateAccessoryStatusDB = async (
+  accessoryId: string,
+  isActive: string,
+  user: JwtPayload
+) => {
+ try {
+  const accessory = await Accessory.findById(accessoryId);
+  if (!accessory) {
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      "accessoryError",
+      "Accessory doesn't exist."
+    );
+  }
+
+  const statusType = isActive=="true" ? "activated" : "deactivated";
+
+  const result = await Accessory.findByIdAndUpdate(
+    accessoryId,
+    {
+      isActive,
+      $push: {
+        eventsHistory: logEvent(statusType, user.faculty, `Accessory ${statusType}`),
+      },
+    },
+    { new: true }
+  );
+
+  return result;
+ } catch (error) {
+  throw new AppError(
+    httpStatus.INTERNAL_SERVER_ERROR,
+    "accessoryError",
+    "Failed to update Accessory status."
+  );
+ }
+};
+
+const updateAccessoryApprovedStatusDB = async (
+  user: JwtPayload,
+  accessoryId: string
+) => {
+ try {
+  const accessory = await Accessory.findById(accessoryId);
+  if (!accessory) {
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      "accessoryError",
+      "Accessory doesn't exist."
+    );
+  }
+
+  const result = await Accessory.findByIdAndUpdate(
+    accessoryId,
+    {
+      isApproved: true,
+      isActive: true,
+      $push: {
+        eventsHistory: logEvent("approved", user.faculty, "Accessory approved"),
+      },
+    },
+    { new: true }
+  );
+
+  return result;
+ } catch (error) {
+  throw new AppError(
+    httpStatus.INTERNAL_SERVER_ERROR,
+    "accessoryError",
+    "Failed to update Approved status."
+  );
+ }
+};
+const deleteSingleImageDB = async (accessoryId: string, imageUrl: string) => {
+  const room = await Faculty.findById(accessoryId);
+  if (!room || !imageUrl) {
+    throw new AppError(httpStatus.NOT_FOUND, "roomError", "Accessory does not exist.");
+  }
+
+  const deleted = await deleteFileFromCloudinary(imageUrl);
+  if (!deleted) {
+    throw new AppError(httpStatus.NOT_FOUND, "imageError", "Failed to delete image.");
+  }
+
+  const updatedRoom = await Faculty.findByIdAndUpdate(
+    accessoryId,
+    { $pull: { images: imageUrl } },
+    { new: true }
+  );
+
+  return updatedRoom;
+};
 export const AccessoryServices = {
   createAccessoryIntoDB,
   getAllAccessoriesDB,
@@ -240,4 +297,5 @@ export const AccessoryServices = {
   updateAccessoryDB,
   updateAccessoryStatusDB,
   updateAccessoryApprovedStatusDB,
+  deleteSingleImageDB
 };

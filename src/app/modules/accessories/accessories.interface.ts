@@ -1,9 +1,16 @@
 import { Types } from "mongoose";
 
-export type TApprovalDetails = {
-  isApproved: boolean;
-  approvedBy?: Types.ObjectId | string; 
-  approvedDate?: Date;
+export type TEventHistory = {
+  eventType:
+    | "created"
+    | "updated"
+    | "approved"
+    | "activated"
+    | "deactivated"
+    | "New Stock";
+  performedBy: Types.ObjectId;
+  performedAt?: Date;
+  comments?: string;
 };
 export type TQuantityDetails = {
   totalQuantity: number;
@@ -21,7 +28,7 @@ export type TCodeDetails = {
 export type TAccessory = {
   _id?: Types.ObjectId | string;
   name: string;
-  category: Types.ObjectId | string; 
+  category: Types.ObjectId | string;
   subCategory: Types.ObjectId | string;
   image?: string;
   codeTitle: string;
@@ -29,11 +36,12 @@ export type TAccessory = {
   isItReturnable: boolean | string;
   quantityDetails: TQuantityDetails;
   codeDetails: TCodeDetails;
-  stock: Types.ObjectId | string; 
+  stock: Types.ObjectId | string;
   status: "Available" | "Low Stock" | "Out of Stock";
   isActive: boolean;
-  approvalDetails: TApprovalDetails;
+  isApproved: boolean;
   isDeleted: boolean;
+  eventsHistory: TEventHistory[];
   createdAt?: Date;
   updatedAt?: Date;
 };
