@@ -36,4 +36,9 @@ router.get("/single-stock", StockController.getSingleStock),
     validateRequest(updateStockQuantityValidation),
     StockController.updateStock
   );
+router.delete(
+  "/delete-image",
+  auth(USER_ROLE.Admin),
+  StockController.deleteSingleImage
+);
 export const StockRoutes = router;

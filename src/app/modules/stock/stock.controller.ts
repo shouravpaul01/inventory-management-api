@@ -5,7 +5,7 @@ import { StockService } from "./stock.service";
 
 const createStock = catchAsync(async (req, res) => {
  const {stockId}=req.params
- 
+ console.log(stockId,"controller")
   const result = await StockService.createStockDB(stockId,req.user,(req as any).files ,req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -57,10 +57,31 @@ const getAllStocks = catchAsync(async (req, res) => {
        data: result,
      });
    });
+   const deleteSingleImage = catchAsync(async (req, res) => {
+    const { stockId, stockDetailsId, imageUrl, fieldName } = req.query as {
+      stockId: string;
+      stockDetailsId: string;
+      imageUrl: string;
+      fieldName: "documentImages" | "locatedImages";
+    };
+    const result = await StockService.deleteSingleImageDB(
+      stockId,
+      stockDetailsId,
+      imageUrl,
+      fieldName
+    );
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Image deleted successfully.",
+      data: result,
+    });
+  });
   export const StockController={
     createStock,
     getAllStocks,
     updateStockApprovedStatus,
     getSingleStock,
-    updateStock
+     updateStock,
+     deleteSingleImage
   }

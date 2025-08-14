@@ -16,3 +16,4 @@ export type TFileUpload = {
   size: number;
   filename: string; 
 };
+export type TFieldDef = { name: string; maxCount?: number };

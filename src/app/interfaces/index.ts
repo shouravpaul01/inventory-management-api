@@ -1,1 +1,0 @@
-export type TFieldDef = { name: string; maxCount?: number };

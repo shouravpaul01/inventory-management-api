@@ -13,7 +13,7 @@ export type TStockDetail = {
   accessoryCodes: string[];
   documentImages: string[];
   locatedDetails:{
-    roomNo:string,
+    roomNo:Types.ObjectId,
     place:string,
     locatedImages:string[]
   }

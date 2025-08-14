@@ -9,7 +9,7 @@ import { deleteFileFromCloudinary } from "../../utils/deleteFileFromCloudinary";
 import { Types } from "mongoose";
 
 const logEvent = (
-  type: "created" | "updated" | "approved" | "activated" | "deactivated",
+  type: "created" | "updated" | "approved" | "activated" | "deactivated" | "stock",
   performedBy: Types.ObjectId,
   comments?: string
 ) => ({
@@ -25,6 +25,8 @@ const createStockDB = async (
   files: Record<string, { path: string }[]> | any,
   payload: Partial<TStockDetail> & { quantity: number }
 ) => {
+  // console.log(files,"files")
+  // console.log(payload,"payload1")
   const session = await Stock.startSession();
   try {
     session.startTransaction();
@@ -41,7 +43,7 @@ const createStockDB = async (
     }
 
     // Map uploaded files into model fields
-    if (files && typeof files === "object") {
+    if (files ) {
       if (Array.isArray(files.documentImages) && files.documentImages.length > 0) {
         payload.documentImages = files.documentImages.map((file: any) => file.path);
       }
@@ -53,23 +55,14 @@ const createStockDB = async (
       }
     }
 
-    if (isExistsAccessory?.isItReturnable) {
-      const codes = await generateAccessoriesCode({
-        totalQuantity: isExistsAccessory?.quantityDetails?.totalQuantity,
-        quantity: payload.quantity,
-        codeTitle: isExistsAccessory?.codeTitle as string,
-      });
-      payload.accessoryCodes = codes;
-    }
-
     payload.eventsHistory = [
       logEvent(
         "created",
-        new Types.ObjectId(String((user as any)?._id || (user as any)?.userId)),
+       (user as any)?.faculty,
         "Stock detail created"
       ),
     ];
-
+console.log(payload,"payload")
     const result = await Stock.findByIdAndUpdate(
       stockId,
       { $push: { details: payload } },
@@ -81,8 +74,8 @@ const createStockDB = async (
       {
         $push: {
           eventsHistory: logEvent(
-            "created",
-            new Types.ObjectId(String((user as any)?._id || (user as any)?.userId)),
+            "stock",
+            (user as any)?.faculty,
             "Stock detail created"
           ),
         },
@@ -93,7 +86,21 @@ const createStockDB = async (
     await session.commitTransaction();
     return result;
   } catch (error) {
+    console.log(error,"error")
     await session.abortTransaction();
+    if (files) {
+      if (Array.isArray(files.documentImages) && files.documentImages.length > 0) {
+       files.documentImages.forEach(async(image:any) => {
+        await deleteFileFromCloudinary(image.path)
+       });
+      }
+      if (Array.isArray(files.locatedImages) && files.locatedImages.length > 0) {
+        
+        files.locatedImages?.forEach(async(image:any) => {
+          await deleteFileFromCloudinary(image.path)
+         });
+      }
+    }
     throw new AppError(httpStatus.BAD_REQUEST,"stockError","Stock Creation failed.Pls try again.");
   } finally {
     session.endSession();
@@ -242,7 +249,7 @@ const getSingleStockDB = async (stockId: string, stockDetailsId: string) => {
     {
       "details.$": 1,
     }
-  );
+  ).populate("details.locatedDetails.roomNo");
   if (!isStockExists) {
     throw new AppError(
       httpStatus.NOT_FOUND,
@@ -251,6 +258,43 @@ const getSingleStockDB = async (stockId: string, stockDetailsId: string) => {
     );
   }
   return isStockExists.details[0];
+};
+const deleteSingleImageDB = async (
+  stockId: string,
+  stockDetailsId: string,
+  imageUrl: string,
+  fieldName: "documentImages" | "locatedImages"
+) => {
+  if (!stockId || !stockDetailsId || !imageUrl || !fieldName) {
+    throw new AppError(httpStatus.BAD_REQUEST, "stockError", "Invalid request parameters.");
+  }
+
+  const isStockExists = await Stock.findOne(
+    { _id: stockId, "details._id": stockDetailsId },
+    { "details.$": 1 }
+  );
+
+  if (!isStockExists) {
+    throw new AppError(httpStatus.NOT_FOUND, "stockError", "Stock doesn't exist.");
+  }
+
+  const deleted = await deleteFileFromCloudinary(imageUrl);
+  if (!deleted) {
+    throw new AppError(httpStatus.NOT_FOUND, "imageError", "Failed to delete image.");
+  }
+
+  const pullPath =
+    fieldName === "documentImages"
+      ? { "details.$.documentImages": imageUrl }
+      : { "details.$.locatedDetails.locatedImages": imageUrl };
+
+  const updatedStock = await Stock.findOneAndUpdate(
+    { _id: stockId, "details._id": stockDetailsId },
+    { $pull: pullPath },
+    { new: true }
+  );
+
+  return updatedStock;
 };
 const updateStockDB = async (
   stockId: string,
@@ -272,7 +316,7 @@ const updateStockDB = async (
       "Stock doesn't exist."
     );
   }
-  // Replace documentImages if new ones uploaded
+ 
   if (files && typeof files === "object") {
     if (Array.isArray(files.documentImages) && files.documentImages.length > 0) {
       const prevDocs = (isStockExists.details[0] as any)?.documentImages || [];
@@ -319,5 +363,6 @@ export const StockService = {
   getAllStocksDB,
   updateStockApprovedStatusDB,
   getSingleStockDB,
+  deleteSingleImageDB,
   updateStockDB,
 };

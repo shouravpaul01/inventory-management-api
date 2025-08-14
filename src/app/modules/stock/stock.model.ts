@@ -25,7 +25,7 @@ const detailSchema = new Schema(
     accessoryCodes: { type: [String], default: [] },
     documentImages: { type: [String], default: [] },
     locatedDetails: {
-      roomNo: { type: String, trim: true },
+      roomNo: { type: Types.ObjectId, ref: "Room" },
       place: { type: String, trim: true },
       locatedImages: { type: [String], default: [] },
     },

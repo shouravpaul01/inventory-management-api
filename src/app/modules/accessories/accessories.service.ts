@@ -1,8 +1,6 @@
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import { TAccessory } from "./accessories.interface";
-
-import { TFileUpload } from "../../interfaces";
 import {
   generateAccessoryCodeTitle,
 } from "./accessories.utils";
@@ -28,7 +26,7 @@ const logEvent = (
 });
 
 const createAccessoryIntoDB = async (
-  file: TFileUpload,
+  file: any,
   payload: TAccessory & { codeTitle: string; quantity: number },
   user: JwtPayload
 ) => {
@@ -49,12 +47,12 @@ const createAccessoryIntoDB = async (
       payload.image = file.path;
     }
 
-    if (payload.isItReturnable === true) {
+    if (payload.isItReturnable === "true") {
       const generateCode = await generateAccessoryCodeTitle(
         payload.subCategory,
         payload.codeTitle
       );
-
+console.log(generateCode,"generateCode")
       const isCodeTitleExists = await Accessory.findOne({
         codeTitle: generateCode,
       }).session(session);
@@ -74,7 +72,7 @@ const createAccessoryIntoDB = async (
     await newStock.save({ session });
     payload.stock = newStock._id;
 
-   
+   console.log(payload,"payload")
     payload.eventsHistory = [
       logEvent("created", user.faculty,"Accessory created")
     ];
@@ -89,7 +87,9 @@ const createAccessoryIntoDB = async (
     if (error instanceof AppError && error.isAppError) {
       throw error;
     }
-
+    if (file) {
+      await deleteFileFromCloudinary(file.path)
+    }
     throw new AppError(
       httpStatus.UNPROCESSABLE_ENTITY,
       "accessoryError",
@@ -140,7 +140,7 @@ const getSingleAccessoryDB = async (accessoryId: string) => {
 
 const updateAccessoryDB = async (
   accessoryId: string,
-  file: TFileUpload,
+  file: any,
   payload: Partial<TAccessory>,
   user: JwtPayload
 ) => {
