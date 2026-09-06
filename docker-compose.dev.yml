@@ -1,0 +1,44 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    image: backend-nodejs-prisma-starter-kit-dev
+    container_name: app-api-dev
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount the current directory for hot reloading
+      - .:/app
+      # Create an anonymous volume for node_modules so local node_modules doesn't overwrite container's node_modules
+      - /app/node_modules
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    depends_on:
+      - redis
+    networks:
+      - app-network
+
+
+
+  redis:
+    image: redis:7-alpine
+    container_name: app-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+volumes:
+  redis_data:
+
+networks:
+  app-network:
+    driver: bridge
