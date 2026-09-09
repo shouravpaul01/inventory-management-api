@@ -20,6 +20,7 @@ import {
   IReviewRequisitionPayload,
 } from "./requisition.interface";
 import { RequisitionUtils } from "./requisition.utils";
+import { NotificationService } from "../Notification/notification.service";
 
 // ════════════════════════════════════════════════════════════
 // 1. CREATE DRAFT REQUISITION
@@ -328,6 +329,28 @@ const submitRequisition = async (id: string, user: IAuthUser) => {
     },
   });
 
+  // Real-time Notification for requester
+  await NotificationService.createNotification({
+    userId: user.id,
+    type: "REQUISITION",
+    title: "Requisition Submitted",
+    message: `Requisition '${requisition.requestNumber}' was submitted successfully.${approvalCheck.required ? " It is currently under review." : " It is ready for processing."}`,
+    referenceType: "Requisition",
+    referenceId: requisition.id,
+  });
+
+  // If no approval workflow was required, alert inventory managers
+  if (!approvalCheck.required) {
+    await NotificationService.notifyRole({
+      roleCode: "INVENTORY_MANAGER",
+      type: "REQUISITION",
+      title: "New Requisition Ready",
+      message: `Requisition '${requisition.requestNumber}' submitted and ready for distribution.`,
+      referenceType: "Requisition",
+      referenceId: requisition.id,
+    });
+  }
+
   return {
     requisition: updatedRequisition,
     approvalRequest,
@@ -449,6 +472,23 @@ const reviewRequisition = async (
     },
   });
 
+  // Real-time Notification to requester on review outcome
+  const reviewMessage =
+    payload.decision === "APPROVED"
+      ? `Your requisition '${requisition.requestNumber}' has been fully approved and is pending distribution.`
+      : payload.decision === "PARTIALLY_APPROVED"
+      ? `Your requisition '${requisition.requestNumber}' has been partially approved.${payload.comments ? ` Reviewer comments: ${payload.comments}` : ""}`
+      : `Your requisition '${requisition.requestNumber}' was rejected.${payload.comments ? ` Reason: ${payload.comments}` : ""}`;
+
+  await NotificationService.createNotification({
+    userId: requisition.requesterId,
+    type: "REQUISITION",
+    title: `Requisition ${payload.decision.replace("_", " ")}`,
+    message: reviewMessage,
+    referenceType: "Requisition",
+    referenceId: requisition.id,
+  });
+
   return updatedRequisition;
 };
 
@@ -502,6 +542,18 @@ const cancelRequisition = async (id: string, reason: string | undefined, user: I
       metadata: { reason },
     },
   });
+
+  // Real-time Notification if cancelled by someone else
+  if (requisition.requesterId !== user.id) {
+    await NotificationService.createNotification({
+      userId: requisition.requesterId,
+      type: "REQUISITION",
+      title: "Requisition Cancelled",
+      message: `Your requisition '${requisition.requestNumber}' was cancelled by an administrator.${reason ? ` Reason: ${reason}` : ""}`,
+      referenceType: "Requisition",
+      referenceId: requisition.id,
+    });
+  }
 
   return updated;
 };

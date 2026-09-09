@@ -19,6 +19,7 @@ import {
   IUpdatePolicyPayload,
 } from "./approval.interface";
 import { evaluateCondition, ApprovalUtils } from "./approval.utils";
+import { NotificationService } from "../Notification/notification.service";
 
 export { IApprovalCheckResult };
 
@@ -183,6 +184,49 @@ const createApprovalRequest = async (params: ICreateApprovalRequestParams) => {
     },
   });
 
+  // Real-time Notification for requester
+  await NotificationService.createNotification({
+    userId: requestedBy.id,
+    type: "APPROVAL",
+    title: "Approval Request Submitted",
+    message: `Approval request '${requestNumber}' for ${entityType} has been submitted (Level 1 of ${totalLevels}).`,
+    referenceType: "ApprovalRequest",
+    referenceId: request.id,
+  });
+
+  // Real-time Notification for designated approver(s)
+  if (policy?.roleId) {
+    const role = await prisma.role.findUnique({ where: { id: policy.roleId } });
+    if (role) {
+      await NotificationService.notifyRole({
+        roleCode: role.code,
+        type: "APPROVAL",
+        title: "Approval Required",
+        message: `Approval request '${requestNumber}' for ${entityType} requires your review.`,
+        referenceType: "ApprovalRequest",
+        referenceId: request.id,
+      });
+    }
+  } else if (policy?.userId) {
+    await NotificationService.createNotification({
+      userId: policy.userId,
+      type: "APPROVAL",
+      title: "Approval Required",
+      message: `Approval request '${requestNumber}' for ${entityType} requires your review.`,
+      referenceType: "ApprovalRequest",
+      referenceId: request.id,
+    });
+  } else {
+    await NotificationService.notifyRole({
+      roleCode: "SUPER_ADMIN",
+      type: "APPROVAL",
+      title: "Approval Required",
+      message: `Approval request '${requestNumber}' for ${entityType} requires review.`,
+      referenceType: "ApprovalRequest",
+      referenceId: request.id,
+    });
+  }
+
   return request;
 };
 
@@ -288,6 +332,16 @@ const actionApprovalRequest = async (
       },
     });
 
+    // Real-time Notification to requester on rejection
+    await NotificationService.createNotification({
+      userId: request.requestedById,
+      type: "APPROVAL",
+      title: "Approval Request Rejected",
+      message: `Approval request '${request.requestNumber}' was rejected by ${user.firstName} ${user.lastName || ""}.${payload.comments ? ` Reason: ${payload.comments}` : ""}`,
+      referenceType: "ApprovalRequest",
+      referenceId: request.id,
+    });
+
     return updatedRequest;
   }
 
@@ -336,6 +390,27 @@ const actionApprovalRequest = async (
       },
     });
 
+    // Real-time Notification on approval progression
+    if (isFinalLevel) {
+      await NotificationService.createNotification({
+        userId: request.requestedById,
+        type: "APPROVAL",
+        title: "Approval Request Approved",
+        message: `Approval request '${request.requestNumber}' for ${request.entityType} has been fully approved!`,
+        referenceType: "ApprovalRequest",
+        referenceId: request.id,
+      });
+    } else {
+      await NotificationService.createNotification({
+        userId: request.requestedById,
+        type: "APPROVAL",
+        title: "Approval Advanced",
+        message: `Approval request '${request.requestNumber}' approved at Level ${request.currentLevel} and advanced to Level ${request.currentLevel + 1}.`,
+        referenceType: "ApprovalRequest",
+        referenceId: request.id,
+      });
+    }
+
     return updatedRequest;
   }
 
@@ -348,6 +423,16 @@ const actionApprovalRequest = async (
       comments: payload.comments,
       actedAt: now,
     },
+  });
+
+  // Real-time Notification to requester for correction
+  await NotificationService.createNotification({
+    userId: request.requestedById,
+    type: "APPROVAL",
+    title: "Returned For Correction",
+    message: `Approval request '${request.requestNumber}' was returned for correction.${payload.comments ? ` Notes: ${payload.comments}` : ""}`,
+    referenceType: "ApprovalRequest",
+    referenceId: request.id,
   });
 
   return getApprovalRequestById(requestId);

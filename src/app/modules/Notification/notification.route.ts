@@ -12,6 +12,13 @@ router.get(
   NotificationController.getMyNotifications
 );
 
+router.get(
+  "/unread-count",
+  auth(),
+  checkPermission("notification.view"),
+  NotificationController.getUnreadCount
+);
+
 router.patch(
   "/mark-all-read",
   auth(),

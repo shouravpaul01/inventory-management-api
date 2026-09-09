@@ -16,6 +16,7 @@ import {
 } from "@prisma/client";
 import { IProcessReturnPayload } from "./return.interface";
 import { ReturnUtils } from "./return.utils";
+import { NotificationService } from "../Notification/notification.service";
 
 const processReturn = async (
   payload: IProcessReturnPayload,
@@ -240,6 +241,31 @@ const processReturn = async (
       },
     },
   });
+
+  // Real-time Notification to returner
+  await NotificationService.createNotification({
+    userId: distribution.receiverId,
+    type: "RETURN",
+    title: "Return Processed",
+    message: `Return transaction '${returnTransaction.returnNumber}' for distribution '${distribution.distributionNo}' has been processed into inventory.`,
+    referenceType: "ReturnTransaction",
+    referenceId: returnTransaction.id,
+  });
+
+  // Real-time Alert to managers if any item was damaged or lost
+  const damagedOrLost = payload.lines.filter((l) =>
+    ["DAMAGED", "LOST", "NEEDS_REPAIR"].includes(l.condition)
+  );
+  if (damagedOrLost.length > 0) {
+    await NotificationService.notifyRole({
+      roleCode: "INVENTORY_MANAGER",
+      type: "ALERT",
+      title: "Return Condition Alert",
+      message: `Return '${returnTransaction.returnNumber}' reported ${damagedOrLost.length} item(s) in DAMAGED/LOST condition!`,
+      referenceType: "ReturnTransaction",
+      referenceId: returnTransaction.id,
+    });
+  }
 
   return getReturnById(returnTransaction.id);
 };

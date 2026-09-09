@@ -14,6 +14,7 @@ import {
   ITransferStockPayload,
 } from "./stock.interface";
 import { StockUtils } from "./stock.utils";
+import { NotificationService } from "../Notification/notification.service";
 
 // ════════════════════════════════════════════════════════════
 // 1. STOCK IN (PURCHASE / INTAKE)
@@ -438,6 +439,22 @@ const adjustStock = async (
       metadata: { oldQuantity, newQuantity: payload.newQuantity, diff, reason: payload.notes },
     },
   });
+
+  // Real-time Alert for downward adjustment or zero stock
+  if (diff < 0 || newAvailable <= 0) {
+    const item = await prisma.inventoryItem.findUnique({
+      where: { id: payload.inventoryItemId },
+      select: { name: true, code: true },
+    });
+    await NotificationService.notifyRole({
+      roleCode: "INVENTORY_MANAGER",
+      type: "STOCK",
+      title: "Stock Adjustment Alert",
+      message: `Stock for '${item?.name || payload.inventoryItemId}' was adjusted downward by ${Math.abs(diff)} units (Available: ${newAvailable}). Reason: ${payload.notes}`,
+      referenceType: "StockBalance",
+      referenceId: balance.id,
+    });
+  }
 
   return { balance: updatedBalance, movement };
 };

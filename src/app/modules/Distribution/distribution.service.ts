@@ -23,6 +23,7 @@ import {
   IConfirmDeliveryPayload,
 } from "./distribution.interface";
 import { DistributionUtils } from "./distribution.utils";
+import { NotificationService } from "../Notification/notification.service";
 
 // ════════════════════════════════════════════════════════════
 // 1. CREATE DISTRIBUTION (ISSUE ASSETS / BULK STOCK)
@@ -278,6 +279,16 @@ const createDistribution = async (
     },
   });
 
+  // Real-time Notification for receiver
+  await NotificationService.createNotification({
+    userId: receiver.id,
+    type: "DISTRIBUTION",
+    title: "Inventory Distributed",
+    message: `Distribution '${distribution.distributionNo}' has been issued to you under requisition '${requisition.requestNumber}'. Please inspect and confirm delivery.`,
+    referenceType: "Distribution",
+    referenceId: distribution.id,
+  });
+
   return getDistributionById(distribution.id);
 };
 
@@ -347,6 +358,18 @@ const confirmDelivery = async (
       },
     },
   });
+
+  // Real-time Notification to dispatcher/issuer upon confirmation
+  if (distribution.issuedById) {
+    await NotificationService.createNotification({
+      userId: distribution.issuedById,
+      type: "DELIVERY",
+      title: "Delivery Receipt Confirmed",
+      message: `Delivery receipt for distribution '${distribution.distributionNo}' was confirmed with status '${payload.deliveryStatus}'.`,
+      referenceType: "Distribution",
+      referenceId: distribution.id,
+    });
+  }
 
   return deliveryConfirmation;
 };
