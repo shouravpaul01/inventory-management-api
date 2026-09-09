@@ -14,27 +14,19 @@ import {
   RequestType,
 } from "@prisma/client";
 import { ApprovalService } from "../Approval/approval.service";
+import {
+  ICreateRequisitionPayload,
+  IUpdateRequisitionPayload,
+  IReviewRequisitionPayload,
+} from "./requisition.interface";
+import { RequisitionUtils } from "./requisition.utils";
 
 // ════════════════════════════════════════════════════════════
 // 1. CREATE DRAFT REQUISITION
 // ════════════════════════════════════════════════════════════
 
 const createRequisition = async (
-  payload: {
-    type?: "REQUISITION" | "ORDER";
-    departmentId: string;
-    purpose: string;
-    remarks?: string;
-    isTemporary?: boolean;
-    requiredFrom?: Date;
-    requiredUntil?: Date;
-    lines: Array<{
-      inventoryItemId: string;
-      requestedQty: number;
-      requestedIssuePolicy?: "PERMANENT" | "TEMPORARY" | "GIFT";
-      remarks?: string;
-    }>;
-  },
+  payload: ICreateRequisitionPayload,
   requester: IAuthUser
 ) => {
   // Validate department exists
@@ -65,13 +57,7 @@ const createRequisition = async (
 
   // If requisition is marked temporary, verify all requested items are returnable
   if (payload.isTemporary) {
-    const nonReturnableItem = items.find((i) => !i.isReturnable);
-    if (nonReturnableItem) {
-      throw new ApiError(
-        httpStatus.BAD_REQUEST,
-        `Item '${nonReturnableItem.name}' is non-returnable and cannot be requested under a temporary requisition.`
-      );
-    }
+    RequisitionUtils.validateReturnableItems(items);
   }
 
   const requestNumber = await generateSequentialCode("REQ_SEQ", "REQ");
@@ -151,20 +137,7 @@ const createRequisition = async (
 
 const updateRequisition = async (
   id: string,
-  payload: {
-    purpose?: string;
-    remarks?: string;
-    isTemporary?: boolean;
-    requiredFrom?: Date;
-    requiredUntil?: Date;
-    lines?: Array<{
-      id?: string;
-      inventoryItemId: string;
-      requestedQty: number;
-      requestedIssuePolicy?: "PERMANENT" | "TEMPORARY" | "GIFT";
-      remarks?: string;
-    }>;
-  },
+  payload: IUpdateRequisitionPayload,
   user: IAuthUser
 ) => {
   const existing = await prisma.requisition.findUnique({
@@ -368,16 +341,7 @@ const submitRequisition = async (id: string, user: IAuthUser) => {
 
 const reviewRequisition = async (
   id: string,
-  payload: {
-    decision: "APPROVED" | "PARTIALLY_APPROVED" | "REJECTED";
-    comments?: string;
-    lines: Array<{
-      lineId: string;
-      approvedQty: number;
-      status: "APPROVED" | "PARTIALLY_APPROVED" | "REJECTED";
-      remarks?: string;
-    }>;
-  },
+  payload: IReviewRequisitionPayload,
   reviewer: IAuthUser
 ) => {
   const requisition = await prisma.requisition.findUnique({
@@ -435,25 +399,14 @@ const reviewRequisition = async (
   }
 
   // Determine final overall requisition status
-  let finalStatus: RequestStatus;
   const updatedLines = await prisma.requisitionLine.findMany({
     where: { requisitionId: requisition.id },
   });
 
-  const allRejected = updatedLines.every(
-    (l) => l.status === RequestLineStatus.REJECTED || l.approvedQty === 0
+  const finalStatus = RequisitionUtils.calculateRequisitionReviewStatus(
+    updatedLines,
+    payload.decision
   );
-  const allApproved = updatedLines.every(
-    (l) => l.status === RequestLineStatus.APPROVED && l.approvedQty === l.requestedQty
-  );
-
-  if (payload.decision === "REJECTED" || allRejected) {
-    finalStatus = RequestStatus.REJECTED;
-  } else if (allApproved) {
-    finalStatus = RequestStatus.APPROVED;
-  } else {
-    finalStatus = RequestStatus.PARTIALLY_APPROVED;
-  }
 
   const updatedRequisition = await prisma.requisition.update({
     where: { id: requisition.id },

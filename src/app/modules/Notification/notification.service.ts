@@ -3,26 +3,14 @@ import prisma from "../../../shared/prisma";
 import ApiError from "../../../errors/ApiErrors";
 import QueryBuilder from "../../../helpers/queryBuilder";
 import { NotificationType } from "@prisma/client";
-
-const toValidObjectId = (id?: string | null): string | undefined => {
-  if (id && /^[0-9a-fA-F]{24}$/.test(id)) {
-    return id;
-  }
-  return undefined;
-};
+import { ICreateNotificationPayload } from "./notification.interface";
+import { NotificationUtils } from "./notification.utils";
 
 // ════════════════════════════════════════════════════════════
 // 1. CREATE NOTIFICATION
 // ════════════════════════════════════════════════════════════
 
-const createNotification = async (payload: {
-  userId: string;
-  type: "SYSTEM" | "APPROVAL" | "REQUISITION" | "DISTRIBUTION" | "RETURN" | "DELIVERY" | "STOCK" | "ALERT";
-  title: string;
-  message: string;
-  referenceType?: string;
-  referenceId?: string;
-}) => {
+const createNotification = async (payload: ICreateNotificationPayload) => {
   const notification = await prisma.notification.create({
     data: {
       userId: payload.userId,
@@ -30,7 +18,7 @@ const createNotification = async (payload: {
       title: payload.title,
       message: payload.message,
       referenceType: payload.referenceType,
-      referenceId: toValidObjectId(payload.referenceId),
+      referenceId: NotificationUtils.toValidObjectId(payload.referenceId),
     },
   });
 

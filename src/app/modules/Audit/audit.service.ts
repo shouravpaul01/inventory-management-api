@@ -2,8 +2,21 @@ import httpStatus from "http-status";
 import prisma from "../../../shared/prisma";
 import ApiError from "../../../errors/ApiErrors";
 import QueryBuilder from "../../../helpers/queryBuilder";
+import { IAuditLogQuery, ICreateAuditLogPayload } from "./audit.interface";
+import { sanitizeAuditSnapshot } from "./audit.utils";
 
-const getAllAuditLogs = async (query: Record<string, unknown>) => {
+const createAuditLog = async (payload: ICreateAuditLogPayload) => {
+  return prisma.auditLog.create({
+    data: {
+      ...payload,
+      action: payload.action as any,
+      beforeData: sanitizeAuditSnapshot(payload.beforeData) as any,
+      afterData: sanitizeAuditSnapshot(payload.afterData) as any,
+    } as any,
+  });
+};
+
+const getAllAuditLogs = async (query: IAuditLogQuery | Record<string, unknown>) => {
   const queryBuilder = new QueryBuilder(prisma.auditLog as any, query, {
     fields: {
       action: { type: "string", filterable: true, sortable: true },
@@ -63,6 +76,8 @@ const getAuditLogById = async (id: string) => {
 };
 
 export const AuditService = {
+  createAuditLog,
   getAllAuditLogs,
   getAuditLogById,
 };
+

@@ -3,21 +3,16 @@ import ApiError from "../../../errors/ApiErrors";
 import QueryBuilder from "../../../helpers/queryBuilder";
 import prisma from "../../../shared/prisma";
 import { generateSequentialCode } from "../../../helpers/sequenceGenerator";
-import { env } from "../../../config/env.config";
 import { ConditionStatus, InventoryUnitStatus, StockMovementType } from "@prisma/client";
+import {
+  IBatchCreateUnitsPayload,
+  ICreateInventoryUnitPayload,
+  IUpdateInventoryUnitPayload,
+} from "./inventoryUnit.interface";
+import { generateQrValue, getAssetPrefix } from "./inventoryUnit.utils";
 
 const createUnit = async (
-  payload: {
-    inventoryItemId: string;
-    uniqueCode?: string;
-    serialNumber?: string;
-    barcode?: string;
-    condition?: "NEW" | "GOOD" | "FAIR" | "POOR" | "DAMAGED";
-    locationId?: string;
-    purchaseDate?: string;
-    warrantyEndDate?: string;
-    notes?: string;
-  },
+  payload: ICreateInventoryUnitPayload,
   actorId?: string
 ) => {
   const item = await prisma.inventoryItem.findUnique({
@@ -45,7 +40,7 @@ const createUnit = async (
   // Generate uniqueCode if not provided
   let uniqueCode = payload.uniqueCode?.trim().toUpperCase();
   if (!uniqueCode) {
-    const prefix = item.code.split("-")[0] || "ASSET";
+    const prefix = getAssetPrefix(item.code);
     uniqueCode = await generateSequentialCode(`${prefix}_UNIT_SEQ`, prefix);
   } else {
     const existing = await prisma.inventoryUnit.findUnique({
@@ -56,8 +51,7 @@ const createUnit = async (
     }
   }
 
-  const baseUrl = env.FRONTEND_URL || "https://inventory.university.edu";
-  const qrValue = `${baseUrl}/assets/${uniqueCode}`;
+  const qrValue = generateQrValue(uniqueCode);
 
   const unit = await prisma.inventoryUnit.create({
     data: {
@@ -112,15 +106,7 @@ const createUnit = async (
 };
 
 const batchCreateUnits = async (
-  payload: {
-    inventoryItemId: string;
-    count: number;
-    locationId?: string;
-    condition?: "NEW" | "GOOD" | "FAIR" | "POOR" | "DAMAGED";
-    notes?: string;
-    purchaseDate?: string;
-    warrantyEndDate?: string;
-  },
+  payload: IBatchCreateUnitsPayload,
   actorId?: string
 ) => {
   const item = await prisma.inventoryItem.findUnique({
@@ -141,13 +127,12 @@ const batchCreateUnits = async (
     if (!loc) throw new ApiError(httpStatus.BAD_REQUEST, "Specified stock location does not exist!");
   }
 
-  const prefix = item.code.split("-")[0] || "ASSET";
-  const baseUrl = env.FRONTEND_URL || "https://inventory.university.edu";
+  const prefix = getAssetPrefix(item.code);
   const createdUnits: any[] = [];
 
   for (let i = 0; i < payload.count; i++) {
     const uniqueCode = await generateSequentialCode(`${prefix}_UNIT_SEQ`, prefix);
-    const qrValue = `${baseUrl}/assets/${uniqueCode}`;
+    const qrValue = generateQrValue(uniqueCode);
 
     const unit = await prisma.inventoryUnit.create({
       data: {
@@ -358,14 +343,7 @@ const getUnitById = async (id: string) => {
 
 const updateUnit = async (
   id: string,
-  payload: {
-    serialNumber?: string;
-    barcode?: string;
-    condition?: "NEW" | "GOOD" | "FAIR" | "POOR" | "DAMAGED";
-    locationId?: string;
-    notes?: string;
-    warrantyEndDate?: string;
-  },
+  payload: IUpdateInventoryUnitPayload,
   actorId?: string
 ) => {
   const before = await getUnitById(id);

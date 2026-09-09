@@ -3,18 +3,32 @@ import ApiError from "../../../errors/ApiErrors";
 import QueryBuilder from "../../../helpers/queryBuilder";
 import prisma from "../../../shared/prisma";
 import { uploadToCloudinary, deleteFromCloudinary } from "../../../helpers/cloudinary";
+import {
+  ICreateBuildingPayload,
+  ICreateFloorPayload,
+  ICreateRoomPayload,
+  ICreateRoomTypePayload,
+  ICreateStockLocationPayload,
+  IUpdateBuildingPayload,
+  IUpdateFloorPayload,
+  IUpdateRoomPayload,
+  IUpdateRoomTypePayload,
+  IUpdateStockLocationPayload,
+} from "./location.interface";
+import { sanitizeLocationCode } from "./location.utils";
 
 // ════════════════════════════════════════════════════════════
 // 1. BUILDING SERVICE
 // ════════════════════════════════════════════════════════════
 
 const createBuilding = async (
-  payload: { name: string; code: string; description?: string; address?: string },
+  payload: ICreateBuildingPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
+  const code = sanitizeLocationCode(payload.code);
   const existing = await prisma.building.findUnique({
-    where: { code: payload.code },
+    where: { code },
   });
 
   if (existing) {
@@ -104,7 +118,7 @@ const getBuildingById = async (id: string) => {
 
 const updateBuilding = async (
   id: string,
-  payload: { name?: string; description?: string; address?: string },
+  payload: IUpdateBuildingPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -187,7 +201,7 @@ const deleteBuilding = async (id: string, actorId?: string) => {
 // ════════════════════════════════════════════════════════════
 
 const createFloor = async (
-  payload: { buildingId: string; name: string; code: string; floorNumber?: number },
+  payload: ICreateFloorPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -291,7 +305,7 @@ const getFloorById = async (id: string) => {
 
 const updateFloor = async (
   id: string,
-  payload: { name?: string; code?: string; floorNumber?: number },
+  payload: IUpdateFloorPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -377,7 +391,7 @@ const deleteFloor = async (id: string, actorId?: string) => {
 // ════════════════════════════════════════════════════════════
 
 const createRoomType = async (
-  payload: { name: string; code: string; description?: string },
+  payload: ICreateRoomTypePayload,
   actorId?: string
 ) => {
   const existing = await prisma.roomType.findUnique({
@@ -454,7 +468,7 @@ const getRoomTypeById = async (id: string) => {
 
 const updateRoomType = async (
   id: string,
-  payload: { name?: string; description?: string },
+  payload: IUpdateRoomTypePayload,
   actorId?: string
 ) => {
   const before = await getRoomTypeById(id);
@@ -516,15 +530,7 @@ const deleteRoomType = async (id: string, actorId?: string) => {
 // ════════════════════════════════════════════════════════════
 
 const createRoom = async (
-  payload: {
-    floorId: string;
-    roomTypeId?: string;
-    name: string;
-    code: string;
-    capacity?: number;
-    description?: string;
-    status?: "ACTIVE" | "MAINTENANCE" | "INACTIVE";
-  },
+  payload: ICreateRoomPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -657,14 +663,7 @@ const getRoomById = async (id: string) => {
 
 const updateRoom = async (
   id: string,
-  payload: {
-    floorId?: string;
-    roomTypeId?: string;
-    name?: string;
-    capacity?: number;
-    description?: string;
-    status?: "ACTIVE" | "INACTIVE";
-  },
+  payload: IUpdateRoomPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -755,15 +754,7 @@ const deleteRoom = async (id: string, actorId?: string) => {
 // ════════════════════════════════════════════════════════════
 
 const createStockLocation = async (
-  payload: {
-    name: string;
-    code: string;
-    type: "STORE" | "ROOM" | "RACK" | "SHELF" | "CABINET" | "OTHER";
-    description?: string;
-    buildingId?: string;
-    floorId?: string;
-    roomId?: string;
-  },
+  payload: ICreateStockLocationPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -897,14 +888,7 @@ const getStockLocationById = async (id: string) => {
 
 const updateStockLocation = async (
   id: string,
-  payload: {
-    name?: string;
-    type?: "STORE" | "ROOM" | "RACK" | "SHELF" | "CABINET" | "OTHER";
-    description?: string;
-    buildingId?: string;
-    floorId?: string;
-    roomId?: string;
-  },
+  payload: IUpdateStockLocationPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {

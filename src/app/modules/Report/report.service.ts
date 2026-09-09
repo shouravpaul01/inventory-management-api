@@ -1,12 +1,14 @@
 import prisma from "../../../shared/prisma";
 import QueryBuilder from "../../../helpers/queryBuilder";
 import { InventoryUnitStatus, IssueMode, RequestStatus, ReturnStatus } from "@prisma/client";
+import { IDashboardOverviewResult, ILowStockReportResult } from "./report.interface";
+import { transformToLowStockRecord } from "./report.utils";
 
 // ════════════════════════════════════════════════════════════
 // 1. DASHBOARD OVERVIEW SUMMARY
 // ════════════════════════════════════════════════════════════
 
-const getDashboardOverview = async () => {
+const getDashboardOverview = async (): Promise<IDashboardOverviewResult> => {
   const [
     totalCatalogItems,
     totalSerializedUnits,
@@ -74,7 +76,7 @@ const getDashboardOverview = async () => {
 // 2. LOW STOCK & REORDER MONITOR
 // ════════════════════════════════════════════════════════════
 
-const getLowStockReport = async () => {
+const getLowStockReport = async (): Promise<ILowStockReportResult> => {
   const items = await prisma.inventoryItem.findMany({
     where: { isActive: true },
     include: {
@@ -88,33 +90,7 @@ const getLowStockReport = async () => {
   });
 
   const lowStockItems = items
-    .map((item) => {
-      const totalAvailable = item.stockBalances.reduce((sum, b) => sum + b.availableQuantity, 0);
-      const totalQuantity = item.stockBalances.reduce((sum, b) => sum + b.quantity, 0);
-      const isBelowMinimum = totalAvailable <= item.minimumStock;
-      const isBelowReorder = totalAvailable <= item.reorderLevel;
-
-      return {
-        id: item.id,
-        code: item.code,
-        name: item.name,
-        category: item.category?.name,
-        trackingType: item.trackingType,
-        minimumStock: item.minimumStock,
-        reorderLevel: item.reorderLevel,
-        currentTotal: totalQuantity,
-        currentAvailable: totalAvailable,
-        isBelowMinimum,
-        isBelowReorder,
-        needsReorder: isBelowMinimum || isBelowReorder,
-        balancesByLocation: item.stockBalances.map((b) => ({
-          locationName: b.location.name,
-          locationCode: b.location.code,
-          quantity: b.quantity,
-          available: b.availableQuantity,
-        })),
-      };
-    })
+    .map((item) => transformToLowStockRecord(item))
     .filter((item) => item.needsReorder);
 
   return {

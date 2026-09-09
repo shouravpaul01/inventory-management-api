@@ -14,24 +14,11 @@ import {
   StockMovementType,
   StockTrackingType,
 } from "@prisma/client";
-
-interface IReturnLineInput {
-  inventoryItemId: string;
-  inventoryUnitId?: string;
-  destinationLocationId: string;
-  quantity: number;
-  condition: "SAME" | "GOOD" | "DAMAGED" | "LOST" | "NEEDS_REPAIR";
-  remarks?: string;
-}
+import { IProcessReturnPayload } from "./return.interface";
+import { ReturnUtils } from "./return.utils";
 
 const processReturn = async (
-  payload: {
-    distributionId: string;
-    remarks?: string;
-    status?: "EXPECTED" | "PARTIALLY_RETURNED" | "RETURNED" | "OVERDUE" | "LOST";
-    lines: IReturnLineInput[];
-    locationSplits?: Array<{ locationId: string; quantity: number }>;
-  },
+  payload: IProcessReturnPayload,
   file?: Express.Multer.File,
   processor?: IAuthUser
 ) => {
@@ -46,8 +33,6 @@ const processReturn = async (
   }
 
   // 2. Pre-validate returnability and locations for each line
-  const locationQtyMap: Record<string, number> = {};
-
   for (const line of payload.lines) {
     const item = await prisma.inventoryItem.findUnique({
       where: { id: line.inventoryItemId },
@@ -87,10 +72,9 @@ const processReturn = async (
         );
       }
     }
-
-    locationQtyMap[line.destinationLocationId] =
-      (locationQtyMap[line.destinationLocationId] || 0) + line.quantity;
   }
+
+  const locationQtyMap = ReturnUtils.aggregateReturnLocations(payload.lines);
 
   // 3. Generate Return Number and Create ReturnTransaction
   const returnNumber = await generateSequentialCode("RET_SEQ", "RET");
@@ -138,19 +122,8 @@ const processReturn = async (
     });
 
     if (item?.trackingType === StockTrackingType.SERIALIZED && line.inventoryUnitId) {
-      let unitStatus: InventoryUnitStatus = InventoryUnitStatus.IN_STOCK;
-      let unitCondition: ConditionStatus = ConditionStatus.GOOD;
-
-      if (line.condition === "DAMAGED") {
-        unitStatus = InventoryUnitStatus.DAMAGED;
-        unitCondition = ConditionStatus.DAMAGED;
-      } else if (line.condition === "LOST") {
-        unitStatus = InventoryUnitStatus.LOST;
-        unitCondition = ConditionStatus.LOST;
-      } else if (line.condition === "NEEDS_REPAIR") {
-        unitStatus = InventoryUnitStatus.MAINTENANCE;
-        unitCondition = ConditionStatus.FAIR;
-      }
+      const { unitStatus, unitCondition } =
+        ReturnUtils.mapReturnConditionToUnitState(line.condition);
 
       await prisma.inventoryUnit.update({
         where: { id: line.inventoryUnitId },

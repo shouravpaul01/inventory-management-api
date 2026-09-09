@@ -18,33 +18,18 @@ import {
   StockMovementType,
   StockTrackingType,
 } from "@prisma/client";
+import {
+  ICreateDistributionPayload,
+  IConfirmDeliveryPayload,
+} from "./distribution.interface";
+import { DistributionUtils } from "./distribution.utils";
 
 // ════════════════════════════════════════════════════════════
 // 1. CREATE DISTRIBUTION (ISSUE ASSETS / BULK STOCK)
 // ════════════════════════════════════════════════════════════
 
-interface IDistributionLineInput {
-  requisitionLineId?: string;
-  inventoryItemId: string;
-  inventoryUnitId?: string;
-  locationId: string;
-  quantity: number;
-  issueMode?: "PERMANENT" | "TEMPORARY" | "GIFT";
-  condition?: "NEW" | "GOOD" | "FAIR" | "DAMAGED" | "LOST" | "DISPOSED";
-  expectedReturnAt?: Date;
-  remarks?: string;
-}
-
 const createDistribution = async (
-  payload: {
-    requisitionId: string;
-    receiverId: string;
-    issueMode?: "PERMANENT" | "TEMPORARY" | "GIFT";
-    handoverMethod?: "SELF_COLLECTION" | "DELIVERED_BY_STAFF" | "COURIER" | "OTHER";
-    expectedReturnAt?: Date;
-    remarks?: string;
-    lines: IDistributionLineInput[];
-  },
+  payload: ICreateDistributionPayload,
   issuer: IAuthUser
 ) => {
   // 1. Verify Requisition
@@ -245,10 +230,10 @@ const createDistribution = async (
       const reqLine = requisition.lines.find((rl) => rl.id === line.requisitionLineId);
       if (reqLine) {
         const newIssuedQty = reqLine.issuedQty + line.quantity;
-        const lineStatus =
-          newIssuedQty >= reqLine.approvedQty
-            ? RequestLineStatus.ISSUED
-            : RequestLineStatus.PARTIALLY_ISSUED;
+        const lineStatus = DistributionUtils.calculateLineFulfillmentStatus(
+          newIssuedQty,
+          reqLine.approvedQty
+        );
 
         await prisma.requisitionLine.update({
           where: { id: line.requisitionLineId },
@@ -266,17 +251,14 @@ const createDistribution = async (
     where: { requisitionId: requisition.id },
   });
 
-  const allFulfilled = updatedReqLines.every((rl) => rl.issuedQty >= rl.approvedQty);
-  const reqFulfillmentStatus = allFulfilled
-    ? FulfillmentStatus.FULFILLED
-    : FulfillmentStatus.PARTIALLY_FULFILLED;
-  const reqStatus = allFulfilled ? RequestStatus.FULFILLED : RequestStatus.PARTIALLY_FULFILLED;
+  const { fulfillmentStatus, status } =
+    DistributionUtils.calculateRequisitionFulfillment(updatedReqLines);
 
   await prisma.requisition.update({
     where: { id: requisition.id },
     data: {
-      fulfillmentStatus: reqFulfillmentStatus,
-      status: reqStatus,
+      fulfillmentStatus,
+      status,
     },
   });
 
@@ -305,11 +287,7 @@ const createDistribution = async (
 
 const confirmDelivery = async (
   distributionId: string,
-  payload: {
-    deliveryStatus: "DELIVERED" | "RECEIVED" | "REJECTED" | "FAILED";
-    receiverRemarks?: string;
-    deliveredById?: string;
-  },
+  payload: IConfirmDeliveryPayload,
   file?: Express.Multer.File,
   actor?: IAuthUser
 ) => {

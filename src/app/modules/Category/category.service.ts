@@ -2,13 +2,16 @@ import httpStatus from "http-status";
 import ApiError from "../../../errors/ApiErrors";
 import QueryBuilder from "../../../helpers/queryBuilder";
 import prisma from "../../../shared/prisma";
+import { ICreateCategoryPayload, IUpdateCategoryPayload } from "./category.interface";
+import { sanitizeCategoryCode, validateSelfParent } from "./category.utils";
 
 const createCategory = async (
-  payload: { name: string; code: string; description?: string; parentId?: string },
+  payload: ICreateCategoryPayload,
   actorId?: string
 ) => {
+  const code = sanitizeCategoryCode(payload.code);
   const existing = await prisma.category.findUnique({
-    where: { code: payload.code },
+    where: { code },
   });
 
   if (existing) {
@@ -127,13 +130,13 @@ const getCategoryById = async (id: string) => {
 
 const updateCategory = async (
   id: string,
-  payload: { name?: string; description?: string; parentId?: string | null },
+  payload: IUpdateCategoryPayload,
   actorId?: string
 ) => {
   const before = await getCategoryById(id);
 
   if (payload.parentId) {
-    if (payload.parentId === id) {
+    if (validateSelfParent(id, payload.parentId)) {
       throw new ApiError(httpStatus.BAD_REQUEST, "A category cannot be its own parent!");
     }
     const parent = await prisma.category.findUnique({

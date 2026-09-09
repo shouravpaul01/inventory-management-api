@@ -5,26 +5,22 @@ import prisma from "../../../shared/prisma";
 import { generateSequentialCode } from "../../../helpers/sequenceGenerator";
 import { uploadToCloudinary } from "../../../helpers/cloudinary";
 import { StockMovementType } from "@prisma/client";
-
-const toValidObjectId = (id?: string | null): string | undefined => {
-  if (id && /^[0-9a-fA-F]{24}$/.test(id)) {
-    return id;
-  }
-  return undefined;
-};
+import {
+  IAdjustStockPayload,
+  IReleaseReservationPayload,
+  IReserveStockPayload,
+  IStockInPayload,
+  IStockOutPayload,
+  ITransferStockPayload,
+} from "./stock.interface";
+import { StockUtils } from "./stock.utils";
 
 // ════════════════════════════════════════════════════════════
 // 1. STOCK IN (PURCHASE / INTAKE)
 // ════════════════════════════════════════════════════════════
 
 const stockIn = async (
-  payload: {
-    inventoryItemId: string;
-    locationId: string;
-    quantity: number;
-    type?: "PURCHASE" | "STOCK_IN" | "INITIAL_STOCK";
-    notes?: string;
-  },
+  payload: IStockInPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -108,13 +104,7 @@ const stockIn = async (
 // ════════════════════════════════════════════════════════════
 
 const stockOut = async (
-  payload: {
-    inventoryItemId: string;
-    locationId: string;
-    quantity: number;
-    type?: "STOCK_OUT" | "DAMAGE" | "LOSS" | "DISPOSAL" | "GIFT";
-    notes?: string;
-  },
+  payload: IStockOutPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -191,14 +181,7 @@ const stockOut = async (
 // ════════════════════════════════════════════════════════════
 
 const transferStock = async (
-  payload: {
-    inventoryItemId: string;
-    fromLocationId: string;
-    toLocationId: string;
-    quantity?: number;
-    inventoryUnitId?: string;
-    notes?: string;
-  },
+  payload: ITransferStockPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -376,12 +359,7 @@ const transferStock = async (
 // ════════════════════════════════════════════════════════════
 
 const adjustStock = async (
-  payload: {
-    inventoryItemId: string;
-    locationId: string;
-    newQuantity: number;
-    notes: string;
-  },
+  payload: IAdjustStockPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -469,13 +447,7 @@ const adjustStock = async (
 // ════════════════════════════════════════════════════════════
 
 const reserveStock = async (
-  payload: {
-    inventoryItemId: string;
-    locationId: string;
-    quantity: number;
-    referenceType?: string;
-    referenceId?: string;
-  },
+  payload: IReserveStockPayload,
   actorId?: string
 ) => {
   const balance = await prisma.stockBalance.findUnique({
@@ -512,10 +484,11 @@ const reserveStock = async (
       fromLocationId: payload.locationId,
       performedById: actorId!,
       referenceType: payload.referenceType,
-      referenceId: toValidObjectId(payload.referenceId),
-      notes: payload.referenceId && !toValidObjectId(payload.referenceId)
-        ? `Stock reserved (${payload.quantity}) [Ref: ${payload.referenceId}]`
-        : `Stock reserved (${payload.quantity})`,
+      referenceId: StockUtils.toValidObjectId(payload.referenceId),
+      notes: StockUtils.formatReferenceNote(
+        `Stock reserved (${payload.quantity})`,
+        payload.referenceId
+      ),
     },
   });
 
@@ -523,13 +496,7 @@ const reserveStock = async (
 };
 
 const releaseReservation = async (
-  payload: {
-    inventoryItemId: string;
-    locationId: string;
-    quantity: number;
-    referenceType?: string;
-    referenceId?: string;
-  },
+  payload: IReleaseReservationPayload,
   actorId?: string
 ) => {
   const balance = await prisma.stockBalance.findUnique({
@@ -566,10 +533,11 @@ const releaseReservation = async (
       toLocationId: payload.locationId,
       performedById: actorId!,
       referenceType: payload.referenceType,
-      referenceId: toValidObjectId(payload.referenceId),
-      notes: payload.referenceId && !toValidObjectId(payload.referenceId)
-        ? `Stock reservation released (${payload.quantity}) [Ref: ${payload.referenceId}]`
-        : `Stock reservation released (${payload.quantity})`,
+      referenceId: StockUtils.toValidObjectId(payload.referenceId),
+      notes: StockUtils.formatReferenceNote(
+        `Stock reservation released (${payload.quantity})`,
+        payload.referenceId
+      ),
     },
   });
 

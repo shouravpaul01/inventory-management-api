@@ -1,21 +1,17 @@
-import bcrypt from "bcrypt";
 import httpStatus from "http-status";
 import ApiError from "../../../errors/ApiErrors";
 import QueryBuilder from "../../../helpers/queryBuilder";
 import prisma from "../../../shared/prisma";
+import {
+  ICreateUserPayload,
+  IPermissionOverrideItem,
+  IUpdateUserPayload,
+  UserStatusType,
+} from "./user.interface";
+import { hashPassword, validateUniqueUserFields } from "./user.utils";
 
 const createUser = async (
-  payload: {
-    employeeId: string;
-    username: string;
-    email: string;
-    firstName: string;
-    lastName?: string;
-    phone?: string;
-    departmentId: string;
-    password: string;
-    roleIds?: string[];
-  },
+  payload: ICreateUserPayload,
   creatorId?: string
 ) => {
   // 1. Validate department
@@ -39,19 +35,11 @@ const createUser = async (
   });
 
   if (existingUser) {
-    if (existingUser.employeeId === payload.employeeId) {
-      throw new ApiError(httpStatus.CONFLICT, `Employee ID '${payload.employeeId}' is already registered!`);
-    }
-    if (existingUser.username === payload.username) {
-      throw new ApiError(httpStatus.CONFLICT, `Username '${payload.username}' is already taken!`);
-    }
-    if (existingUser.email === payload.email) {
-      throw new ApiError(httpStatus.CONFLICT, `Email '${payload.email}' is already in use!`);
-    }
+    validateUniqueUserFields(existingUser, payload);
   }
 
   // 3. Hash password
-  const hashedPassword = await bcrypt.hash(payload.password, 12);
+  const hashedPassword = await hashPassword(payload.password);
 
   // 4. Create user with UserAuth
   const newUser = await prisma.user.create({
@@ -175,12 +163,7 @@ const getUserById = async (id: string) => {
 
 const updateUser = async (
   id: string,
-  payload: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    departmentId?: string;
-  }
+  payload: IUpdateUserPayload
 ) => {
   await getUserById(id);
 
@@ -211,7 +194,7 @@ const updateUser = async (
 
 const updateUserStatus = async (
   id: string,
-  status: "ACTIVE" | "INACTIVE" | "SUSPENDED"
+  status: UserStatusType
 ) => {
   const user = await getUserById(id);
 
@@ -269,7 +252,7 @@ const assignUserRoles = async (
 
 const overrideUserPermissions = async (
   userId: string,
-  overrides: Array<{ permissionId: string; effect: "GRANT" | "REVOKE" }>,
+  overrides: IPermissionOverrideItem[],
   assignedById?: string
 ) => {
   await getUserById(userId);

@@ -6,10 +6,16 @@ import ApiError from "../../../errors/ApiErrors";
 import { jwtHelpers } from "../../../helpers/jwtHelpers";
 import { calculateEffectivePermissions } from "../../../helpers/permissionHelpers";
 import prisma from "../../../shared/prisma";
-import { AuthUtils } from "./auth.utils";
+import { IChangePasswordPayload, ILoginPayload } from "./auth.interface";
+import {
+  AuthUtils,
+  calculateLockoutExpiry,
+  getRemainingLockoutMinutes,
+  setTokenCookies,
+} from "./auth.utils";
 
 const login = async (
-  payload: { email?: string; username?: string; password: string },
+  payload: ILoginPayload,
   res: any
 ) => {
   const identifier = payload.email || payload.username;
@@ -62,9 +68,7 @@ const login = async (
 
   // Check account lockout
   if (user.auth.lockedUntil && user.auth.lockedUntil > new Date()) {
-    const minutesLeft = Math.ceil(
-      (user.auth.lockedUntil.getTime() - Date.now()) / 60000
-    );
+    const minutesLeft = getRemainingLockoutMinutes(user.auth.lockedUntil);
     throw new ApiError(
       httpStatus.FORBIDDEN,
       `Account is temporarily locked due to consecutive failed attempts. Try again in ${minutesLeft} minute(s).`
@@ -84,7 +88,7 @@ const login = async (
       where: { userId: user.id },
       data: {
         failedLoginCount: failedCount,
-        lockedUntil: shouldLock ? new Date(Date.now() + 15 * 60 * 1000) : null,
+        lockedUntil: shouldLock ? calculateLockoutExpiry(15) : null,
       },
     });
 
@@ -235,7 +239,7 @@ const refreshToken = async (token: string, res: any) => {
 
 const changePassword = async (
   userId: string,
-  payload: { oldPassword: string; newPassword: string }
+  payload: IChangePasswordPayload
 ) => {
   const auth = await prisma.userAuth.findUnique({
     where: { userId },

@@ -1,8 +1,12 @@
 import { env } from "../../../config/env.config";
 import { jwtHelpers } from "../../../helpers/jwtHelpers";
 import ms, { StringValue } from "ms";
+import { IAuthTokens, IAuthUserTokenPayload } from "./auth.interface";
 
-const setTokenCookies = (res: any, payload: Record<string, unknown>) => {
+export const setTokenCookies = (
+  res: any,
+  payload: IAuthUserTokenPayload | Record<string, unknown>
+): IAuthTokens => {
   const accessToken = jwtHelpers.generateToken(
     payload,
     env.JWT_SECRET,
@@ -40,4 +44,16 @@ const setTokenCookies = (res: any, payload: Record<string, unknown>) => {
   };
 };
 
-export const AuthUtils = { setTokenCookies };
+export const calculateLockoutExpiry = (minutes = 15): Date => {
+  return new Date(Date.now() + minutes * 60 * 1000);
+};
+
+export const getRemainingLockoutMinutes = (lockedUntil: Date): number => {
+  return Math.ceil((lockedUntil.getTime() - Date.now()) / 60000);
+};
+
+export const AuthUtils = {
+  setTokenCookies,
+  calculateLockoutExpiry,
+  getRemainingLockoutMinutes,
+};

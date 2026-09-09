@@ -2,13 +2,16 @@ import httpStatus from "http-status";
 import ApiError from "../../../errors/ApiErrors";
 import QueryBuilder from "../../../helpers/queryBuilder";
 import prisma from "../../../shared/prisma";
+import { ICreateDepartmentPayload, IUpdateDepartmentPayload } from "./department.interface";
+import { sanitizeDepartmentCode } from "./department.utils";
 
 const createDepartment = async (
-  payload: { name: string; code: string; description?: string },
+  payload: ICreateDepartmentPayload,
   creatorId?: string
 ) => {
+  const code = sanitizeDepartmentCode(payload.code);
   const existing = await prisma.department.findUnique({
-    where: { code: payload.code },
+    where: { code },
   });
 
   if (existing) {
@@ -19,7 +22,10 @@ const createDepartment = async (
   }
 
   const department = await prisma.department.create({
-    data: payload,
+    data: {
+      ...payload,
+      code,
+    },
   });
 
   // Audit log
@@ -95,7 +101,7 @@ const getDepartmentById = async (id: string) => {
 
 const updateDepartment = async (
   id: string,
-  payload: { name?: string; description?: string },
+  payload: IUpdateDepartmentPayload,
   actorId?: string
 ) => {
   const before = await getDepartmentById(id);

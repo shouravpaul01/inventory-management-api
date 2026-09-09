@@ -2,6 +2,8 @@ import httpStatus from "http-status";
 import ApiError from "../../../errors/ApiErrors";
 import QueryBuilder from "../../../helpers/queryBuilder";
 import prisma from "../../../shared/prisma";
+import { ICreateRolePayload, IUpdateRolePayload } from "./rbac.interface";
+import { assertNonSystemRole, sanitizeRoleCode } from "./rbac.utils";
 
 const getAllRoles = async (query: Record<string, unknown>) => {
   const queryBuilder = new QueryBuilder(prisma.role as any, query, {
@@ -60,14 +62,10 @@ const getRoleById = async (id: string) => {
   return role;
 };
 
-const createRole = async (payload: {
-  name: string;
-  code: string;
-  description?: string;
-  permissionIds?: string[];
-}) => {
+const createRole = async (payload: ICreateRolePayload) => {
+  const code = sanitizeRoleCode(payload.code);
   const existing = await prisma.role.findUnique({
-    where: { code: payload.code },
+    where: { code },
   });
 
   if (existing) {
@@ -77,7 +75,7 @@ const createRole = async (payload: {
   const role = await prisma.role.create({
     data: {
       name: payload.name,
-      code: payload.code,
+      code,
       description: payload.description,
       isSystemRole: false,
     },
@@ -99,7 +97,7 @@ const createRole = async (payload: {
 
 const updateRole = async (
   id: string,
-  payload: { name?: string; description?: string }
+  payload: IUpdateRolePayload
 ) => {
   await getRoleById(id);
 
@@ -121,12 +119,7 @@ const updateRole = async (
 const deleteRole = async (id: string) => {
   const role = await getRoleById(id);
 
-  if (role.isSystemRole) {
-    throw new ApiError(
-      httpStatus.FORBIDDEN,
-      "System protected roles cannot be deleted!"
-    );
-  }
+  assertNonSystemRole(role.isSystemRole, "delete");
 
   const userCount = await prisma.userRole.count({
     where: { roleId: id },

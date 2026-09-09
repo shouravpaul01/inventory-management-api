@@ -4,28 +4,24 @@ import QueryBuilder from "../../../helpers/queryBuilder";
 import prisma from "../../../shared/prisma";
 import { uploadToCloudinary, deleteFromCloudinary } from "../../../helpers/cloudinary";
 import { generateSequentialCode } from "../../../helpers/sequenceGenerator";
+import {
+  ICreateCodeSequencePayload,
+  ICreateInventoryItemPayload,
+  IUpdateCodeSequencePayload,
+  IUpdateInventoryItemPayload,
+} from "./inventoryItem.interface";
+import {
+  aggregateUnitStats,
+  deriveCategoryPrefix,
+  sanitizeItemIdentifier,
+} from "./inventoryItem.utils";
 
 // ════════════════════════════════════════════════════════════
 // 1. INVENTORY ITEM (CATALOG MASTER)
 // ════════════════════════════════════════════════════════════
 
 const createInventoryItem = async (
-  payload: {
-    name: string;
-    code?: string;
-    sku?: string;
-    description?: string;
-    categoryId: string;
-    brand?: string;
-    model?: string;
-    trackingType: "SERIALIZED" | "BULK";
-    isReturnable?: boolean;
-    defaultIssuePolicy?: "PERMANENT" | "TEMPORARY" | "GIFT";
-    unitName?: string;
-    minimumStock?: number;
-    reorderLevel?: number;
-    isActive?: boolean;
-  },
+  payload: ICreateInventoryItemPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -39,9 +35,9 @@ const createInventoryItem = async (
   }
 
   // Generate or sanitize item code
-  let itemCode = payload.code?.trim().toUpperCase();
+  let itemCode = sanitizeItemIdentifier(payload.code);
   if (!itemCode) {
-    const categoryPrefix = category.code.slice(0, 3).toUpperCase();
+    const categoryPrefix = deriveCategoryPrefix(category.code);
     itemCode = await generateSequentialCode(`${categoryPrefix}_SEQ`, categoryPrefix);
   } else {
     const existing = await prisma.inventoryItem.findUnique({
@@ -178,10 +174,7 @@ const getInventoryItemById = async (id: string) => {
       where: { inventoryItemId: id },
       _count: { _all: true },
     });
-    unitStats = units.reduce((acc, curr) => {
-      acc[curr.status] = curr._count._all;
-      return acc;
-    }, {} as Record<string, number>);
+    unitStats = aggregateUnitStats(units);
   }
 
   return {
@@ -192,21 +185,7 @@ const getInventoryItemById = async (id: string) => {
 
 const updateInventoryItem = async (
   id: string,
-  payload: {
-    name?: string;
-    sku?: string;
-    description?: string;
-    categoryId?: string;
-    brand?: string;
-    model?: string;
-    trackingType?: "SERIALIZED" | "BULK";
-    isReturnable?: boolean;
-    defaultIssuePolicy?: "PERMANENT" | "TEMPORARY" | "GIFT";
-    unitName?: string;
-    minimumStock?: number;
-    reorderLevel?: number;
-    isActive?: boolean;
-  },
+  payload: IUpdateInventoryItemPayload,
   file?: Express.Multer.File,
   actorId?: string
 ) => {
@@ -305,17 +284,7 @@ const deleteInventoryItem = async (id: string, actorId?: string) => {
 // ════════════════════════════════════════════════════════════
 
 const createCodeSequence = async (
-  payload: {
-    name: string;
-    code: string;
-    prefix: string;
-    separator?: string;
-    startNumber?: number;
-    paddingLength?: number;
-    yearIncluded?: boolean;
-    monthIncluded?: boolean;
-    isActive?: boolean;
-  },
+  payload: ICreateCodeSequencePayload,
   actorId?: string
 ) => {
   const existing = await prisma.codeSequence.findUnique({
@@ -376,15 +345,7 @@ const getCodeSequenceById = async (id: string) => {
 
 const updateCodeSequence = async (
   id: string,
-  payload: {
-    name?: string;
-    prefix?: string;
-    separator?: string;
-    paddingLength?: number;
-    yearIncluded?: boolean;
-    monthIncluded?: boolean;
-    isActive?: boolean;
-  },
+  payload: IUpdateCodeSequencePayload,
   actorId?: string
 ) => {
   const before = await getCodeSequenceById(id);

@@ -8,17 +8,19 @@ import {
   ApprovalDecision,
   ApprovalEntityType,
 } from "@prisma/client";
-import { evaluateCondition } from "./approval.evaluator";
 import { generateSequentialCode } from "../../../helpers/sequenceGenerator";
 import { IAuthUser } from "../../../interfaces";
 import QueryBuilder from "../../../helpers/queryBuilder";
+import {
+  IApprovalCheckResult,
+  ICreateApprovalRequestParams,
+  IProcessApprovalDecisionPayload,
+  ICreatePolicyPayload,
+  IUpdatePolicyPayload,
+} from "./approval.interface";
+import { evaluateCondition, ApprovalUtils } from "./approval.utils";
 
-export interface IApprovalCheckResult {
-  required: boolean;
-  bypassed?: boolean;
-  policy?: any;
-  reason?: string;
-}
+export { IApprovalCheckResult };
 
 // ─── REUSABLE APPROVAL ENGINE CHECK ──────────────────────────────────────────
 
@@ -119,15 +121,7 @@ const checkApprovalRequirement = async (params: {
 
 // ─── CREATE APPROVAL REQUEST ─────────────────────────────────────────────────
 
-const createApprovalRequest = async (params: {
-  entityType: ApprovalEntityType;
-  entityId: string;
-  permissionCode: string;
-  requestedBy: IAuthUser;
-  policy: any;
-  reason?: string;
-  metadata?: Record<string, any>;
-}) => {
+const createApprovalRequest = async (params: ICreateApprovalRequestParams) => {
   const {
     entityType,
     entityId,
@@ -197,10 +191,7 @@ const createApprovalRequest = async (params: {
 const actionApprovalRequest = async (
   requestId: string,
   user: IAuthUser,
-  payload: {
-    decision: "APPROVE" | "REJECT" | "REQUEST_CHANGE";
-    comments?: string;
-  }
+  payload: IProcessApprovalDecisionPayload
 ) => {
   const request = await prisma.approvalRequest.findUnique({
     where: { id: requestId },
@@ -449,16 +440,7 @@ const getApprovalRequestById = async (id: string) => {
 // ─── POLICY CRUD ─────────────────────────────────────────────────────────────
 
 const createPolicy = async (
-  payload: {
-    permissionCode: string;
-    requirement?: "REQUIRED" | "NOT_REQUIRED";
-    scope?: "SYSTEM" | "ROLE" | "USER";
-    roleId?: string;
-    userId?: string;
-    condition?: any;
-    approvalLevelCount?: number;
-    allowSelfApproval?: boolean;
-  },
+  payload: ICreatePolicyPayload,
   creatorId?: string
 ) => {
   const permission = await prisma.permission.findUnique({
@@ -543,13 +525,7 @@ const getPolicyById = async (id: string) => {
 
 const updatePolicy = async (
   id: string,
-  payload: {
-    requirement?: "REQUIRED" | "NOT_REQUIRED";
-    condition?: any;
-    approvalLevelCount?: number;
-    allowSelfApproval?: boolean;
-    isActive?: boolean;
-  }
+  payload: IUpdatePolicyPayload
 ) => {
   await getPolicyById(id);
 
