@@ -14,6 +14,7 @@ import { DistributionRoutes } from "../modules/Distribution/distribution.route";
 import { ReturnRoutes } from "../modules/Return/return.route";
 import { AuditRoutes } from "../modules/Audit/audit.route";
 import { NotificationRoutes } from "../modules/Notification/notification.route";
+import { ReportRoutes } from "../modules/Report/report.route";
 
 const router = express.Router();
 
@@ -77,6 +78,10 @@ const moduleRoutes = [
   {
     path: "/notifications",
     route: NotificationRoutes,
+  },
+  {
+    path: "/reports",
+    route: ReportRoutes,
   },
 ];
 
