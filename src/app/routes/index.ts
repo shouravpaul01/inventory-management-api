@@ -6,6 +6,7 @@ import { ApprovalRoutes } from "../modules/Approval/approval.route";
 import { DepartmentRoutes } from "../modules/Department/department.route";
 import { LocationRoutes } from "../modules/Location/location.route";
 import { CategoryRoutes } from "../modules/Category/category.route";
+import { InventoryItemRoutes } from "../modules/InventoryItem/inventoryItem.route";
 
 const router = express.Router();
 
@@ -37,6 +38,10 @@ const moduleRoutes = [
   {
     path: "/categories",
     route: CategoryRoutes,
+  },
+  {
+    path: "/inventory",
+    route: InventoryItemRoutes,
   },
 ];
 
