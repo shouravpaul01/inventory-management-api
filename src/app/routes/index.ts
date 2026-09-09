@@ -12,6 +12,8 @@ import { StockRoutes } from "../modules/Stock/stock.route";
 import { RequisitionRoutes } from "../modules/Requisition/requisition.route";
 import { DistributionRoutes } from "../modules/Distribution/distribution.route";
 import { ReturnRoutes } from "../modules/Return/return.route";
+import { AuditRoutes } from "../modules/Audit/audit.route";
+import { NotificationRoutes } from "../modules/Notification/notification.route";
 
 const router = express.Router();
 
@@ -67,6 +69,14 @@ const moduleRoutes = [
   {
     path: "/returns",
     route: ReturnRoutes,
+  },
+  {
+    path: "/audit-logs",
+    route: AuditRoutes,
+  },
+  {
+    path: "/notifications",
+    route: NotificationRoutes,
   },
 ];
 
