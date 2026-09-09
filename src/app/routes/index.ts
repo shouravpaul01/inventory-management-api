@@ -9,6 +9,7 @@ import { CategoryRoutes } from "../modules/Category/category.route";
 import { InventoryItemRoutes } from "../modules/InventoryItem/inventoryItem.route";
 import { InventoryUnitRoutes } from "../modules/InventoryUnit/inventoryUnit.route";
 import { StockRoutes } from "../modules/Stock/stock.route";
+import { RequisitionRoutes } from "../modules/Requisition/requisition.route";
 
 const router = express.Router();
 
@@ -52,6 +53,10 @@ const moduleRoutes = [
   {
     path: "/stock",
     route: StockRoutes,
+  },
+  {
+    path: "/requisitions",
+    route: RequisitionRoutes,
   },
 ];
 
