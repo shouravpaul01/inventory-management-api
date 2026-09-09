@@ -5,6 +5,7 @@ import { RbacRoutes } from "../modules/RBAC/rbac.route";
 import { ApprovalRoutes } from "../modules/Approval/approval.route";
 import { DepartmentRoutes } from "../modules/Department/department.route";
 import { LocationRoutes } from "../modules/Location/location.route";
+import { CategoryRoutes } from "../modules/Category/category.route";
 
 const router = express.Router();
 
@@ -32,6 +33,10 @@ const moduleRoutes = [
   {
     path: "/locations",
     route: LocationRoutes,
+  },
+  {
+    path: "/categories",
+    route: CategoryRoutes,
   },
 ];
 
