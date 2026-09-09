@@ -1,83 +1,114 @@
-
 import { Request, Response } from "express";
 import httpStatus from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
-import { UserServices } from "./user.service";
+import { UserService } from "./user.service";
 
-const getMe = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.getMe(req.user.id);
+const createUser = catchAsync(async (req: Request, res: Response) => {
+  const creatorId = req.user?.id;
+  const result = await UserService.createUser(req.body, creatorId);
+
   sendResponse(res, {
-    statusCode: httpStatus.OK,
+    statusCode: httpStatus.CREATED,
     success: true,
-    message: "Profile fetched successfully.",
+    message: "User created successfully",
     data: result,
-  });
-});
-
-const updateMe = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.updateMe(req.user.id,req.file as Express.Multer.File, req.body);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Profile updated successfully.",
-    data: result,
-  });
-});
-
-const deleteMe = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.deleteMe(req.user.id);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: result.message,
-    data: null,
   });
 });
 
 const getAllUsers = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.getAllUsers(req.query as any);
+  const result = await UserService.getAllUsers(req.query);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Users fetched successfully.",
-    data: result.data,
+    message: "Users retrieved successfully",
     meta: result.meta,
+    data: result.data,
   });
 });
 
 const getUserById = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.getUserById(req.params.id as string);
+  const userId = req.params.id as string;
+  const result = await UserService.getUserById(userId);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "User fetched successfully.",
+    message: "User details retrieved successfully",
+    data: result,
+  });
+});
+
+const updateUser = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.params.id as string;
+  const result = await UserService.updateUser(userId, req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User updated successfully",
     data: result,
   });
 });
 
 const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserServices.updateUserStatus(
-    req.params.id as string,
-    req.body.status,
+  const userId = req.params.id as string;
+  const result = await UserService.updateUserStatus(
+    userId,
+    req.body.status
   );
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "User status updated successfully.",
+    message: "User status updated successfully",
     data: result,
   });
 });
 
+const assignUserRoles = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.params.id as string;
+  const assignedById = req.user?.id;
+  const result = await UserService.assignUserRoles(
+    userId,
+    req.body.roleIds,
+    assignedById
+  );
 
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User roles assigned successfully",
+    data: result,
+  });
+});
+
+const overrideUserPermissions = catchAsync(
+  async (req: Request, res: Response) => {
+    const userId = req.params.id as string;
+    const assignedById = req.user?.id;
+    const result = await UserService.overrideUserPermissions(
+      userId,
+      req.body.overrides,
+      assignedById
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "User permissions overridden successfully",
+      data: result,
+    });
+  }
+);
 
 export const UserController = {
-  getMe,
-  updateMe,
-  deleteMe,
-
+  createUser,
   getAllUsers,
   getUserById,
+  updateUser,
   updateUserStatus,
-
+  assignUserRoles,
+  overrideUserPermissions,
 };
