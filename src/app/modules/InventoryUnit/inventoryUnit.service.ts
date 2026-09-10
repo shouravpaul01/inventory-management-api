@@ -10,6 +10,7 @@ import {
   IUpdateInventoryUnitPayload,
 } from "./inventoryUnit.interface";
 import { generateQrValue, getAssetPrefix } from "./inventoryUnit.utils";
+import { AuditService } from "../Audit/audit.service";
 
 const createUnit = async (
   payload: ICreateInventoryUnitPayload,
@@ -91,15 +92,12 @@ const createUnit = async (
   }
 
   // Audit log
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATE",
-      module: "InventoryUnit",
-      entityType: "InventoryUnit",
-      entityId: unit.id,
-      afterData: unit as any,
-    },
+  await AuditService.logCreate({
+    module: "InventoryUnit",
+    entityType: "InventoryUnit",
+    entityId: unit.id,
+    actorId,
+    afterData: unit as any,
   });
 
   return unit;
@@ -168,15 +166,12 @@ const batchCreateUnits = async (
     createdUnits.push(unit);
   }
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATE",
-      module: "InventoryUnit",
-      entityType: "InventoryUnit",
-      entityId: item.id,
-      metadata: { count: payload.count, prefix },
-    },
+  await AuditService.logCreate({
+    module: "InventoryUnit",
+    entityType: "InventoryUnit",
+    entityId: item.id,
+    actorId,
+    metadata: { count: payload.count, prefix },
   });
 
   return createdUnits;
@@ -369,16 +364,13 @@ const updateUnit = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "UPDATE",
-      module: "InventoryUnit",
-      entityType: "InventoryUnit",
-      entityId: id,
-      beforeData: before as any,
-      afterData: updated as any,
-    },
+  await AuditService.logUpdate({
+    module: "InventoryUnit",
+    entityType: "InventoryUnit",
+    entityId: id,
+    actorId,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;

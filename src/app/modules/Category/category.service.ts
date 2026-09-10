@@ -4,6 +4,7 @@ import QueryBuilder from "../../../helpers/queryBuilder";
 import prisma from "../../../shared/prisma";
 import { ICreateCategoryPayload, IUpdateCategoryPayload } from "./category.interface";
 import { sanitizeCategoryCode, validateSelfParent } from "./category.utils";
+import { AuditService } from "../Audit/audit.service";
 
 const createCategory = async (
   payload: ICreateCategoryPayload,
@@ -34,15 +35,12 @@ const createCategory = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATE",
-      module: "Category",
-      entityType: "Category",
-      entityId: category.id,
-      afterData: category as any,
-    },
+  await AuditService.logCreate({
+    module: "Category",
+    entityType: "Category",
+    entityId: category.id,
+    actorId,
+    afterData: category as any,
   });
 
   return category;
@@ -156,16 +154,13 @@ const updateCategory = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "UPDATE",
-      module: "Category",
-      entityType: "Category",
-      entityId: id,
-      beforeData: before as any,
-      afterData: updated as any,
-    },
+  await AuditService.logUpdate({
+    module: "Category",
+    entityType: "Category",
+    entityId: id,
+    actorId,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;
@@ -200,15 +195,12 @@ const deleteCategory = async (id: string, actorId?: string) => {
     where: { id },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "DELETE",
-      module: "Category",
-      entityType: "Category",
-      entityId: id,
-      beforeData: category as any,
-    },
+  await AuditService.logDelete({
+    module: "Category",
+    entityType: "Category",
+    entityId: id,
+    actorId,
+    beforeData: category as any,
   });
 
   return { message: "Category deleted successfully!" };

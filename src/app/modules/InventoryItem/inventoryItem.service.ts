@@ -15,6 +15,7 @@ import {
   deriveCategoryPrefix,
   sanitizeItemIdentifier,
 } from "./inventoryItem.utils";
+import { AuditService } from "../Audit/audit.service";
 
 // ════════════════════════════════════════════════════════════
 // 1. INVENTORY ITEM (CATALOG MASTER)
@@ -92,15 +93,12 @@ const createInventoryItem = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATE",
-      module: "Inventory",
-      entityType: "InventoryItem",
-      entityId: item.id,
-      afterData: item as any,
-    },
+  await AuditService.logCreate({
+    module: "Inventory",
+    entityType: "InventoryItem",
+    entityId: item.id,
+    actorId,
+    afterData: item as any,
   });
 
   return item;
@@ -228,16 +226,13 @@ const updateInventoryItem = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "UPDATE",
-      module: "Inventory",
-      entityType: "InventoryItem",
-      entityId: id,
-      beforeData: before as any,
-      afterData: updated as any,
-    },
+  await AuditService.logUpdate({
+    module: "Inventory",
+    entityType: "InventoryItem",
+    entityId: id,
+    actorId,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;
@@ -265,15 +260,12 @@ const deleteInventoryItem = async (id: string, actorId?: string) => {
 
   await prisma.inventoryItem.delete({ where: { id } });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "DELETE",
-      module: "Inventory",
-      entityType: "InventoryItem",
-      entityId: id,
-      beforeData: item as any,
-    },
+  await AuditService.logDelete({
+    module: "Inventory",
+    entityType: "InventoryItem",
+    entityId: id,
+    actorId,
+    beforeData: item as any,
   });
 
   return { message: "Inventory item deleted successfully!" };
@@ -302,15 +294,12 @@ const createCodeSequence = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATE",
-      module: "CodeSequence",
-      entityType: "CodeSequence",
-      entityId: seq.id,
-      afterData: seq as any,
-    },
+  await AuditService.logCreate({
+    module: "CodeSequence",
+    entityType: "CodeSequence",
+    entityId: seq.id,
+    actorId,
+    afterData: seq as any,
   });
 
   return seq;
@@ -355,16 +344,13 @@ const updateCodeSequence = async (
     data: payload,
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "UPDATE",
-      module: "CodeSequence",
-      entityType: "CodeSequence",
-      entityId: id,
-      beforeData: before as any,
-      afterData: updated as any,
-    },
+  await AuditService.logUpdate({
+    module: "CodeSequence",
+    entityType: "CodeSequence",
+    entityId: id,
+    actorId,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;

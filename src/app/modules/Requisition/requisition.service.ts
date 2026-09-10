@@ -21,6 +21,7 @@ import {
 } from "./requisition.interface";
 import { RequisitionUtils } from "./requisition.utils";
 import { NotificationService } from "../Notification/notification.service";
+import { AuditService } from "../Audit/audit.service";
 
 // ════════════════════════════════════════════════════════════
 // 1. CREATE DRAFT REQUISITION
@@ -114,18 +115,15 @@ const createRequisition = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: requester.id,
-      action: AuditAction.CREATE,
-      module: "Requisition",
-      entityType: "Requisition",
-      entityId: requisition.id,
-      metadata: {
-        requestNumber: requisition.requestNumber,
-        departmentId: requisition.departmentId,
-        lineCount: payload.lines.length,
-      },
+  await AuditService.logCreate({
+    module: "Requisition",
+    entityType: "Requisition",
+    entityId: requisition.id,
+    actorId: requester.id,
+    metadata: {
+      requestNumber: requisition.requestNumber,
+      departmentId: requisition.departmentId,
+      lineCount: payload.lines.length,
     },
   });
 
@@ -220,15 +218,12 @@ const updateRequisition = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: user.id,
-      action: AuditAction.UPDATE,
-      module: "Requisition",
-      entityType: "Requisition",
-      entityId: id,
-      metadata: { fieldsUpdated: Object.keys(payload) },
-    },
+  await AuditService.logUpdate({
+    module: "Requisition",
+    entityType: "Requisition",
+    entityId: id,
+    actorId: user.id,
+    metadata: { fieldsUpdated: Object.keys(payload) },
   });
 
   return updated;
@@ -314,18 +309,15 @@ const submitRequisition = async (id: string, user: IAuthUser) => {
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: user.id,
-      action: AuditAction.SUBMIT,
-      module: "Requisition",
-      entityType: "Requisition",
-      entityId: requisition.id,
-      metadata: {
-        requestNumber: requisition.requestNumber,
-        status: newStatus,
-        approvalRequestId: approvalRequest?.id,
-      },
+  await AuditService.logAction(AuditAction.SUBMIT, {
+    module: "Requisition",
+    entityType: "Requisition",
+    entityId: requisition.id,
+    actorId: user.id,
+    metadata: {
+      requestNumber: requisition.requestNumber,
+      status: newStatus,
+      approvalRequestId: approvalRequest?.id,
     },
   });
 
@@ -456,21 +448,21 @@ const reviewRequisition = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: reviewer.id,
-      action: payload.decision === "REJECTED" ? AuditAction.REJECT : AuditAction.APPROVE,
+  await AuditService.logAction(
+    payload.decision === "REJECTED" ? AuditAction.REJECT : AuditAction.APPROVE,
+    {
       module: "Requisition",
       entityType: "Requisition",
       entityId: requisition.id,
+      actorId: reviewer.id,
       metadata: {
         requestNumber: requisition.requestNumber,
         decision: payload.decision,
         finalStatus,
         reviewerComments: payload.comments,
       },
-    },
-  });
+    }
+  );
 
   // Real-time Notification to requester on review outcome
   const reviewMessage =
@@ -532,15 +524,12 @@ const cancelRequisition = async (id: string, reason: string | undefined, user: I
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: user.id,
-      action: AuditAction.UPDATE,
-      module: "Requisition",
-      entityType: "Requisition",
-      entityId: requisition.id,
-      metadata: { reason },
-    },
+  await AuditService.logUpdate({
+    module: "Requisition",
+    entityType: "Requisition",
+    entityId: requisition.id,
+    actorId: user.id,
+    metadata: { reason },
   });
 
   // Real-time Notification if cancelled by someone else
@@ -675,14 +664,11 @@ const deleteRequisition = async (id: string, user: IAuthUser) => {
     where: { id },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: user.id,
-      action: AuditAction.DELETE,
-      module: "Requisition",
-      entityType: "Requisition",
-      entityId: id,
-    },
+  await AuditService.logDelete({
+    module: "Requisition",
+    entityType: "Requisition",
+    entityId: id,
+    actorId: user.id,
   });
 
   return { message: "Requisition deleted successfully" };

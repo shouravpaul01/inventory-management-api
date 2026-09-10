@@ -4,6 +4,7 @@ import QueryBuilder from "../../../helpers/queryBuilder";
 import prisma from "../../../shared/prisma";
 import { ICreateDepartmentPayload, IUpdateDepartmentPayload } from "./department.interface";
 import { sanitizeDepartmentCode } from "./department.utils";
+import { AuditService } from "../Audit/audit.service";
 
 const createDepartment = async (
   payload: ICreateDepartmentPayload,
@@ -29,15 +30,12 @@ const createDepartment = async (
   });
 
   // Audit log
-  await prisma.auditLog.create({
-    data: {
-      actorId: creatorId,
-      action: "CREATE",
-      module: "Department",
-      entityType: "Department",
-      entityId: department.id,
-      afterData: department as any,
-    },
+  await AuditService.logCreate({
+    module: "Department",
+    entityType: "Department",
+    entityId: department.id,
+    actorId: creatorId,
+    afterData: department as any,
   });
 
   return department;
@@ -112,16 +110,13 @@ const updateDepartment = async (
   });
 
   // Audit log
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "UPDATE",
-      module: "Department",
-      entityType: "Department",
-      entityId: id,
-      beforeData: before as any,
-      afterData: updated as any,
-    },
+  await AuditService.logUpdate({
+    module: "Department",
+    entityType: "Department",
+    entityId: id,
+    actorId,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;
@@ -146,15 +141,12 @@ const deleteDepartment = async (id: string, actorId?: string) => {
   });
 
   // Audit log
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "DELETE",
-      module: "Department",
-      entityType: "Department",
-      entityId: id,
-      beforeData: department as any,
-    },
+  await AuditService.logDelete({
+    module: "Department",
+    entityType: "Department",
+    entityId: id,
+    actorId,
+    beforeData: department as any,
   });
 
   return { message: "Department deleted successfully!" };

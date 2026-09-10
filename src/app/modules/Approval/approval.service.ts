@@ -7,6 +7,7 @@ import {
   ApprovalStatus,
   ApprovalDecision,
   ApprovalEntityType,
+  AuditAction,
 } from "@prisma/client";
 import { generateSequentialCode } from "../../../helpers/sequenceGenerator";
 import { IAuthUser } from "../../../interfaces";
@@ -20,6 +21,7 @@ import {
 } from "./approval.interface";
 import { evaluateCondition, ApprovalUtils } from "./approval.utils";
 import { NotificationService } from "../Notification/notification.service";
+import { AuditService } from "../Audit/audit.service";
 
 export { IApprovalCheckResult };
 
@@ -171,17 +173,14 @@ const createApprovalRequest = async (params: ICreateApprovalRequestParams) => {
   });
 
   // Audit log for approval request creation
-  await prisma.auditLog.create({
-    data: {
-      actorId: requestedBy.id,
-      action: "CREATE",
-      module: "Approval",
-      entityType: "ApprovalRequest",
-      entityId: request.id,
-      approvalRequired: true,
-      approvalRequestId: request.id,
-      metadata: { requestNumber, permissionCode, totalLevels },
-    },
+  await AuditService.logCreate({
+    module: "Approval",
+    entityType: "ApprovalRequest",
+    entityId: request.id,
+    actorId: requestedBy.id,
+    approvalRequired: true,
+    approvalRequestId: request.id,
+    metadata: { requestNumber, permissionCode, totalLevels },
   });
 
   // Real-time Notification for requester
@@ -320,16 +319,13 @@ const actionApprovalRequest = async (
     });
 
     // Audit log
-    await prisma.auditLog.create({
-      data: {
-        actorId: user.id,
-        action: "REJECT",
-        module: "Approval",
-        entityType: "ApprovalRequest",
-        entityId: requestId,
-        approvalRequestId: requestId,
-        metadata: { comments: payload.comments, level: request.currentLevel },
-      },
+    await AuditService.logAction(AuditAction.REJECT, {
+      module: "Approval",
+      entityType: "ApprovalRequest",
+      entityId: requestId,
+      actorId: user.id,
+      approvalRequestId: requestId,
+      metadata: { comments: payload.comments, level: request.currentLevel },
     });
 
     // Real-time Notification to requester on rejection
@@ -374,19 +370,16 @@ const actionApprovalRequest = async (
     });
 
     // Audit log
-    await prisma.auditLog.create({
-      data: {
-        actorId: user.id,
-        action: "APPROVE",
-        module: "Approval",
-        entityType: "ApprovalRequest",
-        entityId: requestId,
-        approvalRequestId: requestId,
-        metadata: {
-          comments: payload.comments,
-          level: request.currentLevel,
-          isFinal: isFinalLevel,
-        },
+    await AuditService.logAction(AuditAction.APPROVE, {
+      module: "Approval",
+      entityType: "ApprovalRequest",
+      entityId: requestId,
+      actorId: user.id,
+      approvalRequestId: requestId,
+      metadata: {
+        comments: payload.comments,
+        level: request.currentLevel,
+        isFinal: isFinalLevel,
       },
     });
 

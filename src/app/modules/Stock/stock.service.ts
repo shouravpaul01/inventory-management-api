@@ -4,7 +4,7 @@ import QueryBuilder from "../../../helpers/queryBuilder";
 import prisma from "../../../shared/prisma";
 import { generateSequentialCode } from "../../../helpers/sequenceGenerator";
 import { uploadToCloudinary } from "../../../helpers/cloudinary";
-import { StockMovementType } from "@prisma/client";
+import { StockMovementType, AuditAction } from "@prisma/client";
 import {
   IAdjustStockPayload,
   IReleaseReservationPayload,
@@ -15,6 +15,7 @@ import {
 } from "./stock.interface";
 import { StockUtils } from "./stock.utils";
 import { NotificationService } from "../Notification/notification.service";
+import { AuditService } from "../Audit/audit.service";
 
 // ════════════════════════════════════════════════════════════
 // 1. STOCK IN (PURCHASE / INTAKE)
@@ -81,19 +82,16 @@ const stockIn = async (
     });
   }
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "STOCK_IN",
-      module: "Stock",
-      entityType: "StockMovement",
-      entityId: movement.id,
-      metadata: {
-        inventoryItemId: item.id,
-        locationId: location.id,
-        quantity: payload.quantity,
-        newBalance: balance.quantity,
-      },
+  await AuditService.logAction(AuditAction.STOCK_IN, {
+    module: "Stock",
+    entityType: "StockMovement",
+    entityId: movement.id,
+    actorId,
+    metadata: {
+      inventoryItemId: item.id,
+      locationId: location.id,
+      quantity: payload.quantity,
+      newBalance: balance.quantity,
     },
   });
 
@@ -158,19 +156,16 @@ const stockOut = async (
     });
   }
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "STOCK_OUT",
-      module: "Stock",
-      entityType: "StockMovement",
-      entityId: movement.id,
-      metadata: {
-        inventoryItemId: payload.inventoryItemId,
-        locationId: payload.locationId,
-        quantity: payload.quantity,
-        newBalance: updatedBalance.quantity,
-      },
+  await AuditService.logAction(AuditAction.STOCK_OUT, {
+    module: "Stock",
+    entityType: "StockMovement",
+    entityId: movement.id,
+    actorId,
+    metadata: {
+      inventoryItemId: payload.inventoryItemId,
+      locationId: payload.locationId,
+      quantity: payload.quantity,
+      newBalance: updatedBalance.quantity,
     },
   });
 
@@ -250,15 +245,12 @@ const transferStock = async (
       });
     }
 
-    await prisma.auditLog.create({
-      data: {
-        actorId,
-        action: "TRANSFER",
-        module: "Stock",
-        entityType: "InventoryUnit",
-        entityId: unit.id,
-        metadata: { fromLocationId: payload.fromLocationId, toLocationId: payload.toLocationId },
-      },
+    await AuditService.logAction(AuditAction.TRANSFER, {
+      module: "Stock",
+      entityType: "InventoryUnit",
+      entityId: unit.id,
+      actorId,
+      metadata: { fromLocationId: payload.fromLocationId, toLocationId: payload.toLocationId },
     });
 
     return { movement, unit };
@@ -336,18 +328,15 @@ const transferStock = async (
       });
     }
 
-    await prisma.auditLog.create({
-      data: {
-        actorId,
-        action: "TRANSFER",
-        module: "Stock",
-        entityType: "StockMovement",
-        entityId: movement.id,
-        metadata: {
-          fromLocationId: payload.fromLocationId,
-          toLocationId: payload.toLocationId,
-          quantity: qty,
-        },
+    await AuditService.logAction(AuditAction.TRANSFER, {
+      module: "Stock",
+      entityType: "StockMovement",
+      entityId: movement.id,
+      actorId,
+      metadata: {
+        fromLocationId: payload.fromLocationId,
+        toLocationId: payload.toLocationId,
+        quantity: qty,
       },
     });
 
@@ -427,17 +416,14 @@ const adjustStock = async (
     });
   }
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "ADJUST",
-      module: "Stock",
-      entityType: "StockBalance",
-      entityId: balance.id,
-      beforeData: balance as any,
-      afterData: updatedBalance as any,
-      metadata: { oldQuantity, newQuantity: payload.newQuantity, diff, reason: payload.notes },
-    },
+  await AuditService.logAction(AuditAction.ADJUST, {
+    module: "Stock",
+    entityType: "StockBalance",
+    entityId: balance.id,
+    actorId,
+    beforeData: balance as any,
+    afterData: updatedBalance as any,
+    metadata: { oldQuantity, newQuantity: payload.newQuantity, diff, reason: payload.notes },
   });
 
   // Real-time Alert for downward adjustment or zero stock

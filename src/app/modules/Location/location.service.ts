@@ -16,6 +16,7 @@ import {
   IUpdateStockLocationPayload,
 } from "./location.interface";
 import { sanitizeLocationCode } from "./location.utils";
+import { AuditService } from "../Audit/audit.service";
 
 // ════════════════════════════════════════════════════════════
 // 1. BUILDING SERVICE
@@ -52,15 +53,12 @@ const createBuilding = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATE",
-      module: "Location",
-      entityType: "Building",
-      entityId: building.id,
-      afterData: building as any,
-    },
+  await AuditService.logCreate({
+    module: "Location",
+    entityType: "Building",
+    entityId: building.id,
+    actorId,
+    afterData: building as any,
   });
 
   return building;
@@ -145,16 +143,13 @@ const updateBuilding = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "UPDATE",
-      module: "Location",
-      entityType: "Building",
-      entityId: id,
-      beforeData: before as any,
-      afterData: updated as any,
-    },
+  await AuditService.logUpdate({
+    module: "Location",
+    entityType: "Building",
+    entityId: id,
+    actorId,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;
@@ -182,15 +177,12 @@ const deleteBuilding = async (id: string, actorId?: string) => {
     where: { id },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "DELETE",
-      module: "Location",
-      entityType: "Building",
-      entityId: id,
-      beforeData: building as any,
-    },
+  await AuditService.logDelete({
+    module: "Location",
+    entityType: "Building",
+    entityId: id,
+    actorId,
+    beforeData: building as any,
   });
 
   return { message: "Building deleted successfully!" };
@@ -233,15 +225,12 @@ const createFloor = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATE",
-      module: "Location",
-      entityType: "Floor",
-      entityId: floor.id,
-      afterData: floor as any,
-    },
+  await AuditService.logCreate({
+    module: "Location",
+    entityType: "Floor",
+    entityId: floor.id,
+    actorId,
+    afterData: floor as any,
   });
 
   return floor;
@@ -335,16 +324,13 @@ const updateFloor = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "UPDATE",
-      module: "Location",
-      entityType: "Floor",
-      entityId: id,
-      beforeData: before as any,
-      afterData: updated as any,
-    },
+  await AuditService.logUpdate({
+    module: "Location",
+    entityType: "Floor",
+    entityId: id,
+    actorId,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;
@@ -372,15 +358,12 @@ const deleteFloor = async (id: string, actorId?: string) => {
     where: { id },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "DELETE",
-      module: "Location",
-      entityType: "Floor",
-      entityId: id,
-      beforeData: floor as any,
-    },
+  await AuditService.logDelete({
+    module: "Location",
+    entityType: "Floor",
+    entityId: id,
+    actorId,
+    beforeData: floor as any,
   });
 
   return { message: "Floor deleted successfully!" };
@@ -406,15 +389,12 @@ const createRoomType = async (
     data: payload,
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATE",
-      module: "Location",
-      entityType: "RoomType",
-      entityId: roomType.id,
-      afterData: roomType as any,
-    },
+  await AuditService.logCreate({
+    module: "Location",
+    entityType: "RoomType",
+    entityId: roomType.id,
+    actorId,
+    afterData: roomType as any,
   });
 
   return roomType;
@@ -478,16 +458,13 @@ const updateRoomType = async (
     data: payload,
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "UPDATE",
-      module: "Location",
-      entityType: "RoomType",
-      entityId: id,
-      beforeData: before as any,
-      afterData: updated as any,
-    },
+  await AuditService.logUpdate({
+    module: "Location",
+    entityType: "RoomType",
+    entityId: id,
+    actorId,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;
@@ -511,15 +488,12 @@ const deleteRoomType = async (id: string, actorId?: string) => {
     where: { id },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "DELETE",
-      module: "Location",
-      entityType: "RoomType",
-      entityId: id,
-      beforeData: roomType as any,
-    },
+  await AuditService.logDelete({
+    module: "Location",
+    entityType: "RoomType",
+    entityId: id,
+    actorId,
+    beforeData: roomType as any,
   });
 
   return { message: "Room type deleted successfully!" };
@@ -590,15 +564,12 @@ const createRoom = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATE",
-      module: "Location",
-      entityType: "Room",
-      entityId: room.id,
-      afterData: room as any,
-    },
+  await AuditService.logCreate({
+    module: "Location",
+    entityType: "Room",
+    entityId: room.id,
+    actorId,
+    afterData: room as any,
   });
 
   return room;
@@ -698,16 +669,13 @@ const updateRoom = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "UPDATE",
-      module: "Location",
-      entityType: "Room",
-      entityId: id,
-      beforeData: before as any,
-      afterData: updated as any,
-    },
+  await AuditService.logUpdate({
+    module: "Location",
+    entityType: "Room",
+    entityId: id,
+    actorId,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;
@@ -735,15 +703,12 @@ const deleteRoom = async (id: string, actorId?: string) => {
     where: { id },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "DELETE",
-      module: "Location",
-      entityType: "Room",
-      entityId: id,
-      beforeData: room as any,
-    },
+  await AuditService.logDelete({
+    module: "Location",
+    entityType: "Room",
+    entityId: id,
+    actorId,
+    beforeData: room as any,
   });
 
   return { message: "Room deleted successfully!" };
@@ -796,15 +761,12 @@ const createStockLocation = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "CREATE",
-      module: "Location",
-      entityType: "StockLocation",
-      entityId: location.id,
-      afterData: location as any,
-    },
+  await AuditService.logCreate({
+    module: "Location",
+    entityType: "StockLocation",
+    entityId: location.id,
+    actorId,
+    afterData: location as any,
   });
 
   return location;
@@ -919,16 +881,13 @@ const updateStockLocation = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "UPDATE",
-      module: "Location",
-      entityType: "StockLocation",
-      entityId: id,
-      beforeData: before as any,
-      afterData: updated as any,
-    },
+  await AuditService.logUpdate({
+    module: "Location",
+    entityType: "StockLocation",
+    entityId: id,
+    actorId,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;
@@ -967,15 +926,12 @@ const deleteStockLocation = async (id: string, actorId?: string) => {
     where: { id },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action: "DELETE",
-      module: "Location",
-      entityType: "StockLocation",
-      entityId: id,
-      beforeData: location as any,
-    },
+  await AuditService.logDelete({
+    module: "Location",
+    entityType: "StockLocation",
+    entityId: id,
+    actorId,
+    beforeData: location as any,
   });
 
   return { message: "Stock location deleted successfully!" };

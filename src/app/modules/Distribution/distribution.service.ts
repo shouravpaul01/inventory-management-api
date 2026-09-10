@@ -24,6 +24,7 @@ import {
 } from "./distribution.interface";
 import { DistributionUtils } from "./distribution.utils";
 import { NotificationService } from "../Notification/notification.service";
+import { AuditService } from "../Audit/audit.service";
 
 // ════════════════════════════════════════════════════════════
 // 1. CREATE DISTRIBUTION (ISSUE ASSETS / BULK STOCK)
@@ -263,19 +264,16 @@ const createDistribution = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: issuer.id,
-      action: AuditAction.DISTRIBUTE,
-      module: "Distribution",
-      entityType: "Distribution",
-      entityId: distribution.id,
-      metadata: {
-        distributionNo: distribution.distributionNo,
-        requisitionId: requisition.id,
-        receiverId: receiver.id,
-        lineCount: payload.lines.length,
-      },
+  await AuditService.logAction(AuditAction.DISTRIBUTE, {
+    module: "Distribution",
+    entityType: "Distribution",
+    entityId: distribution.id,
+    actorId: issuer.id,
+    metadata: {
+      distributionNo: distribution.distributionNo,
+      requisitionId: requisition.id,
+      receiverId: receiver.id,
+      lineCount: payload.lines.length,
     },
   });
 
@@ -345,17 +343,14 @@ const confirmDelivery = async (
     },
   });
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: actor?.id,
-      action: AuditAction.UPDATE,
-      module: "Distribution",
-      entityType: "DeliveryConfirmation",
-      entityId: deliveryConfirmation.id,
-      metadata: {
-        distributionId: distribution.id,
-        status: payload.deliveryStatus,
-      },
+  await AuditService.logUpdate({
+    module: "Distribution",
+    entityType: "DeliveryConfirmation",
+    entityId: deliveryConfirmation.id,
+    actorId: actor?.id,
+    metadata: {
+      distributionId: distribution.id,
+      status: payload.deliveryStatus,
     },
   });
 

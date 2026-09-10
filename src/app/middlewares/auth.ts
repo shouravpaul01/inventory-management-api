@@ -7,6 +7,7 @@ import prisma from "../../shared/prisma";
 import { env } from "../../config/env.config";
 import { calculateEffectivePermissions } from "../../helpers/permissionHelpers";
 import { IAuthUser } from "../../interfaces";
+import { RequestContext } from "../../helpers/requestContext";
 
 const auth = (...roles: string[]) => {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -94,6 +95,11 @@ const auth = (...roles: string[]) => {
         roles: userRoleCodes,
         permissions: effectivePermissions,
       };
+
+      RequestContext.setContext({
+        actorId: user.id,
+        user: req.user,
+      });
 
       next();
     } catch (err) {

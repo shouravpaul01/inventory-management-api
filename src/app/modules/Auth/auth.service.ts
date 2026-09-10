@@ -13,6 +13,8 @@ import {
   getRemainingLockoutMinutes,
   setTokenCookies,
 } from "./auth.utils";
+import { AuditAction } from "@prisma/client";
+import { AuditService } from "../Audit/audit.service";
 
 const login = async (
   payload: ILoginPayload,
@@ -92,7 +94,23 @@ const login = async (
       },
     });
 
+    await AuditService.logAction(AuditAction.LOGIN_FAILED, {
+      module: "Auth",
+      entityType: "User",
+      entityId: user.id,
+      actorId: user.id,
+      metadata: { identifier, failedAttempts: failedCount },
+    });
+
     if (shouldLock) {
+      await AuditService.logAction(AuditAction.ACCOUNT_LOCK, {
+        module: "Auth",
+        entityType: "User",
+        entityId: user.id,
+        actorId: user.id,
+        metadata: { reason: "5 consecutive failed login attempts", lockoutDurationMinutes: 15 },
+      });
+
       throw new ApiError(
         httpStatus.FORBIDDEN,
         "Account locked for 15 minutes due to 5 consecutive failed login attempts."
@@ -114,6 +132,14 @@ const login = async (
 
   const userRoleCodes = user.roles.map((ur) => ur.role.code);
   const effectivePermissions = calculateEffectivePermissions(user as any);
+
+  await AuditService.logAction(AuditAction.LOGIN, {
+    module: "Auth",
+    entityType: "User",
+    entityId: user.id,
+    actorId: user.id,
+    metadata: { username: user.username, email: user.email },
+  });
 
   const authUserPayload = {
     id: user.id,
@@ -262,6 +288,14 @@ const changePassword = async (
       password: newHashedPassword,
       passwordChangedAt: new Date(),
     },
+  });
+
+  await AuditService.logAction(AuditAction.PASSWORD_CHANGE, {
+    module: "Auth",
+    entityType: "User",
+    entityId: userId,
+    actorId: userId,
+    metadata: { changedAt: new Date() },
   });
 
   return { message: "Password updated successfully!" };

@@ -1,18 +1,119 @@
 import httpStatus from "http-status";
+import { AuditAction } from "@prisma/client";
 import prisma from "../../../shared/prisma";
 import ApiError from "../../../errors/ApiErrors";
 import QueryBuilder from "../../../helpers/queryBuilder";
-import { IAuditLogQuery, ICreateAuditLogPayload } from "./audit.interface";
+import { RequestContext } from "../../../helpers/requestContext";
+import { IAuditLogPayload, IAuditLogQuery } from "./audit.interface";
 import { sanitizeAuditSnapshot } from "./audit.utils";
 
-const createAuditLog = async (payload: ICreateAuditLogPayload) => {
-  return prisma.auditLog.create({
-    data: {
-      ...payload,
-      action: payload.action as any,
-      beforeData: sanitizeAuditSnapshot(payload.beforeData) as any,
-      afterData: sanitizeAuditSnapshot(payload.afterData) as any,
-    } as any,
+/**
+ * Core unified audit logger method.
+ * Automatically resolves actorId, ipAddress, userAgent from RequestContext
+ * if not explicitly provided, sanitizes snapshots deeply, supports Prisma transactions,
+ * and isolates errors so primary business transactions are never broken by logging issues.
+ */
+const log = async (payload: IAuditLogPayload) => {
+  const actorId = payload.actorId || RequestContext.getActorId() || null;
+  const ipAddress = payload.ipAddress || RequestContext.getIpAddress() || null;
+  const userAgent = payload.userAgent || RequestContext.getUserAgent() || null;
+
+  const client = (payload.tx as any) || prisma;
+
+  try {
+    const beforeData = payload.beforeData
+      ? sanitizeAuditSnapshot(payload.beforeData)
+      : undefined;
+    const afterData = payload.afterData
+      ? sanitizeAuditSnapshot(payload.afterData)
+      : undefined;
+    const metadata = payload.metadata
+      ? sanitizeAuditSnapshot(payload.metadata)
+      : undefined;
+
+    return await client.auditLog.create({
+      data: {
+        action: payload.action as any,
+        module: payload.module,
+        entityType: payload.entityType,
+        entityId: payload.entityId,
+        actorId,
+        ipAddress,
+        userAgent,
+        beforeData: beforeData as any,
+        afterData: afterData as any,
+        metadata: metadata as any,
+        approvalRequired: payload.approvalRequired ?? false,
+        approvalRequestId: payload.approvalRequestId,
+        approvalBypassed: payload.approvalBypassed ?? false,
+        bypassReason: payload.bypassReason,
+      },
+    });
+  } catch (error) {
+    console.error(
+      `[AUDIT_LOG_ERROR] Failed to record audit log for module '${payload.module}' (${payload.action}):`,
+      error
+    );
+
+    // Only throw error if the caller explicitly requested strict transactional auditing
+    if (payload.failSilently === false) {
+      throw error;
+    }
+    return null;
+  }
+};
+
+/**
+ * Semantic helper: Log entity creation
+ */
+const logCreate = async (
+  params: Omit<IAuditLogPayload, "action"> & { afterData?: Record<string, unknown> }
+) => {
+  return log({
+    ...params,
+    action: AuditAction.CREATE,
+  });
+};
+
+/**
+ * Semantic helper: Log entity update with before & after state
+ */
+const logUpdate = async (
+  params: Omit<IAuditLogPayload, "action"> & {
+    beforeData?: Record<string, unknown> | null;
+    afterData?: Record<string, unknown> | null;
+  }
+) => {
+  return log({
+    ...params,
+    action: AuditAction.UPDATE,
+  });
+};
+
+/**
+ * Semantic helper: Log entity deletion with before state
+ */
+const logDelete = async (
+  params: Omit<IAuditLogPayload, "action"> & {
+    beforeData?: Record<string, unknown> | null;
+  }
+) => {
+  return log({
+    ...params,
+    action: AuditAction.DELETE,
+  });
+};
+
+/**
+ * Semantic helper: Log custom business action (e.g. STOCK_IN, APPROVE, LOGIN)
+ */
+const logAction = async (
+  action: AuditAction | string,
+  params: Omit<IAuditLogPayload, "action">
+) => {
+  return log({
+    ...params,
+    action,
   });
 };
 
@@ -53,7 +154,7 @@ const getAllAuditLogs = async (query: IAuditLogQuery | Record<string, unknown>) 
 };
 
 const getAuditLogById = async (id: string) => {
-  const log = await prisma.auditLog.findUnique({
+  const logRecord = await prisma.auditLog.findUnique({
     where: { id },
     include: {
       actor: {
@@ -68,16 +169,20 @@ const getAuditLogById = async (id: string) => {
     },
   });
 
-  if (!log) {
+  if (!logRecord) {
     throw new ApiError(httpStatus.NOT_FOUND, "Audit log record not found!");
   }
 
-  return log;
+  return logRecord;
 };
 
 export const AuditService = {
-  createAuditLog,
+  log,
+  logCreate,
+  logUpdate,
+  logDelete,
+  logAction,
+  createAuditLog: log, // Backward compatibility
   getAllAuditLogs,
   getAuditLogById,
 };
-

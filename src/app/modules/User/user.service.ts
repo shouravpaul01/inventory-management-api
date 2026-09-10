@@ -9,6 +9,8 @@ import {
   UserStatusType,
 } from "./user.interface";
 import { hashPassword, validateUniqueUserFields } from "./user.utils";
+import { AuditAction } from "@prisma/client";
+import { AuditService } from "../Audit/audit.service";
 
 const createUser = async (
   payload: ICreateUserPayload,
@@ -77,6 +79,14 @@ const createUser = async (
       });
     }
   }
+
+  await AuditService.logCreate({
+    module: "User",
+    entityType: "User",
+    entityId: newUser.id,
+    actorId: creatorId,
+    afterData: newUser as any,
+  });
 
   return getUserById(newUser.id);
 };
@@ -165,7 +175,7 @@ const updateUser = async (
   id: string,
   payload: IUpdateUserPayload
 ) => {
-  await getUserById(id);
+  const before = await getUserById(id);
 
   if (payload.departmentId) {
     const dept = await prisma.department.findUnique({
@@ -187,6 +197,14 @@ const updateUser = async (
         },
       },
     },
+  });
+
+  await AuditService.logUpdate({
+    module: "User",
+    entityType: "User",
+    entityId: id,
+    beforeData: before as any,
+    afterData: updated as any,
   });
 
   return updated;
@@ -211,6 +229,15 @@ const updateUserStatus = async (
     include: {
       department: true,
     },
+  });
+
+  await AuditService.logUpdate({
+    module: "User",
+    entityType: "User",
+    entityId: id,
+    beforeData: { status: user.status },
+    afterData: { status },
+    metadata: { action: "STATUS_CHANGE", previousStatus: user.status, newStatus: status },
   });
 
   return updated;
@@ -247,6 +274,14 @@ const assignUserRoles = async (
     });
   }
 
+  await AuditService.logAction(AuditAction.UPDATE, {
+    module: "User",
+    entityType: "UserRole",
+    entityId: userId,
+    actorId: assignedById,
+    metadata: { roleIds },
+  });
+
   return getUserById(userId);
 };
 
@@ -282,6 +317,14 @@ const overrideUserPermissions = async (
       },
     });
   }
+
+  await AuditService.logAction(AuditAction.UPDATE, {
+    module: "User",
+    entityType: "UserPermissionOverride",
+    entityId: userId,
+    actorId: assignedById,
+    metadata: { overrides },
+  });
 
   return getUserById(userId);
 };

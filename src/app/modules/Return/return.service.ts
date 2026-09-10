@@ -17,6 +17,7 @@ import {
 import { IProcessReturnPayload } from "./return.interface";
 import { ReturnUtils } from "./return.utils";
 import { NotificationService } from "../Notification/notification.service";
+import { AuditService } from "../Audit/audit.service";
 
 const processReturn = async (
   payload: IProcessReturnPayload,
@@ -227,18 +228,15 @@ const processReturn = async (
     }
   }
 
-  await prisma.auditLog.create({
-    data: {
-      actorId: processor?.id,
-      action: AuditAction.RETURN,
-      module: "Return",
-      entityType: "ReturnTransaction",
-      entityId: returnTransaction.id,
-      metadata: {
-        returnNumber: returnTransaction.returnNumber,
-        distributionId: distribution.id,
-        lineCount: payload.lines.length,
-      },
+  await AuditService.logAction(AuditAction.RETURN, {
+    module: "Return",
+    entityType: "ReturnTransaction",
+    entityId: returnTransaction.id,
+    actorId: processor?.id,
+    metadata: {
+      returnNumber: returnTransaction.returnNumber,
+      distributionId: distribution.id,
+      lineCount: payload.lines.length,
     },
   });
 
