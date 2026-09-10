@@ -63,10 +63,46 @@ const logout = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const forgotPassword = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.forgotPassword(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: { expiresIn: result.expiresIn },
+  });
+});
+
+const verifyResetOtp = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.verifyResetOtp(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: { resetToken: result.resetToken, expiresIn: result.expiresIn },
+  });
+});
+
+const resetPassword = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.resetPassword(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: null,
+  });
+});
+
 export const AuthController = {
   login,
   getMe,
   refreshToken,
   changePassword,
   logout,
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword,
 };

@@ -9,6 +9,20 @@ export interface IChangePasswordPayload {
   newPassword: string;
 }
 
+export interface IForgotPasswordPayload {
+  email: string;
+}
+
+export interface IVerifyResetOtpPayload {
+  email: string;
+  otp: string;
+}
+
+export interface IResetPasswordPayload {
+  resetToken: string;
+  newPassword: string;
+}
+
 export interface IAuthUserTokenPayload {
   [key: string]: unknown;
   id: string;

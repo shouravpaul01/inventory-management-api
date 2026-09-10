@@ -6,7 +6,18 @@ import ApiError from "../../../errors/ApiErrors";
 import { jwtHelpers } from "../../../helpers/jwtHelpers";
 import { calculateEffectivePermissions } from "../../../helpers/permissionHelpers";
 import prisma from "../../../shared/prisma";
-import { IChangePasswordPayload, ILoginPayload } from "./auth.interface";
+import crypto from "crypto";
+import redis from "../../../shared/redis";
+import { EmailQueueService } from "../../../services/Email/email.service";
+import { getOtpEmailTemplate } from "../../../utils/emailTemplate";
+import { generateOtp } from "../../../utils/generateOtp";
+import {
+  IChangePasswordPayload,
+  IForgotPasswordPayload,
+  ILoginPayload,
+  IResetPasswordPayload,
+  IVerifyResetOtpPayload,
+} from "./auth.interface";
 import {
   AuthUtils,
   calculateLockoutExpiry,
@@ -301,9 +312,149 @@ const changePassword = async (
   return { message: "Password updated successfully!" };
 };
 
+const forgotPassword = async (payload: IForgotPasswordPayload) => {
+  const email = payload.email.toLowerCase().trim();
+
+  // 1. Check if user exists and is active
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { auth: true },
+  });
+
+  if (!user || !user.auth) {
+    throw new ApiError(httpStatus.NOT_FOUND, "No account found with this email address!");
+  }
+
+  if (user.status !== "ACTIVE") {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      `Account is ${user.status.toLowerCase()}! Please contact your administrator.`
+    );
+  }
+
+  // 2. Rate limit cooldown (60 seconds per email) to prevent spamming
+  const rateLimitKey = `otp:rate:${email}`;
+  const isRateLimited = await redis.get(rateLimitKey);
+  if (isRateLimited) {
+    const ttl = await redis.ttl(rateLimitKey);
+    throw new ApiError(
+      httpStatus.TOO_MANY_REQUESTS,
+      `Please wait ${ttl > 0 ? ttl : 60} seconds before requesting another OTP.`
+    );
+  }
+
+  // 3. Generate a secure 6-digit numeric OTP using utils
+  const otp = generateOtp();
+
+  // 4. Store in Redis with 5 minutes (300s) expiration
+  const otpKey = `otp:reset:${email}`;
+  await redis.set(otpKey, otp, "EX", 300);
+  await redis.set(rateLimitKey, "1", "EX", 60);
+
+  // 5. Generate template from utils and dispatch email via BullMQ queue service
+  const emailHtml = getOtpEmailTemplate({
+    name: user.firstName,
+    otp,
+    expiresInMinutes: 5,
+  });
+
+  await EmailQueueService.sendEmailViaQueue({
+    to: email,
+    subject: "Password Reset Verification Code",
+    html: emailHtml,
+  });
+
+  return {
+    message: "Password reset OTP sent to your email successfully.",
+    expiresIn: 300,
+  };
+};
+
+const verifyResetOtp = async (payload: IVerifyResetOtpPayload) => {
+  const email = payload.email.toLowerCase().trim();
+  const otpKey = `otp:reset:${email}`;
+
+  const storedOtp = await redis.get(otpKey);
+
+  if (!storedOtp) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "OTP has expired or was not requested. Please request a new one."
+    );
+  }
+
+  if (storedOtp !== payload.otp.trim()) {
+    throw new ApiError(httpStatus.BAD_REQUEST, "Invalid OTP code!");
+  }
+
+  // Consume OTP
+  await redis.del(otpKey);
+
+  // Generate secure reset token with 15 minutes validity
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  const tokenKey = `reset_token:${resetToken}`;
+  await redis.set(tokenKey, email, "EX", 900);
+
+  return {
+    message: "OTP verified successfully.",
+    resetToken,
+    expiresIn: 900,
+  };
+};
+
+const resetPassword = async (payload: IResetPasswordPayload) => {
+  const tokenKey = `reset_token:${payload.resetToken}`;
+  const email = await redis.get(tokenKey);
+
+  if (!email) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      "Password reset session has expired or is invalid. Please request a new OTP."
+    );
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { auth: true },
+  });
+
+  if (!user || !user.auth) {
+    throw new ApiError(httpStatus.NOT_FOUND, "User account not found!");
+  }
+
+  const newHashedPassword = await bcrypt.hash(payload.newPassword, 12);
+
+  await prisma.userAuth.update({
+    where: { userId: user.id },
+    data: {
+      password: newHashedPassword,
+      passwordChangedAt: new Date(),
+      failedLoginCount: 0,
+      lockedUntil: null,
+    },
+  });
+
+  // Consume reset token
+  await redis.del(tokenKey);
+
+  // Record audit log
+  await AuditService.logAction(AuditAction.PASSWORD_RESET, {
+    module: "Auth",
+    entityType: "User",
+    entityId: user.id,
+    actorId: user.id,
+    metadata: { email, resetAt: new Date() },
+  });
+
+  return { message: "Password has been reset successfully! You may now log in." };
+};
+
 export const AuthService = {
   login,
   getMe,
   refreshToken,
   changePassword,
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword,
 };
