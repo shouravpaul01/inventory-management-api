@@ -5,14 +5,16 @@ export const parseBodyData = (
   res: Response,
   next: NextFunction
 ) => {
-  if (req.body.bodyData) {
+  if (req.body.bodyData || req.body.data) {
     try {
-      req.body = JSON.parse(req.body.bodyData);
-      console.log("body", req.body);
+      const raw = req.body.bodyData || req.body.data;
+      if (typeof raw === "string") {
+        req.body = JSON.parse(raw);
+      }
     } catch (error) {
       return res.status(400).json({
         success: false,
-        message: "Invalid JSON format in bodyData",
+        message: "Invalid JSON format in multipart body data",
       });
     }
   }

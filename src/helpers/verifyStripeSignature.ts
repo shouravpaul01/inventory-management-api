@@ -1,10 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import Stripe from "stripe";
-import config from "../config";
+import { env } from "../config/env.config";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
-});
+const stripe = new Stripe(((env as any).STRIPE_SECRET_KEY as string) || "mock_key");
 
 export const verifyStripeSignature = (
   req: Request,
@@ -20,20 +18,16 @@ export const verifyStripeSignature = (
   let event: Stripe.Event;
 
   try {
-    // req.body must be raw, use express.raw() for this route
     event = stripe.webhooks.constructEvent(
       req.body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      ((env as any).STRIPE_WEBHOOK_SECRET as string) || "mock_secret"
     );
 
-    // Attach the verified event to the request object
     (req as any).stripeEvent = event;
-
     next();
   } catch (err: any) {
     console.error("Stripe signature verification failed:", err.message);
-    // return res.status(400).send(`Webhook Error: ${err.message}`);
     next(err);
   }
 };
