@@ -10,6 +10,9 @@ export interface DecodedToken {
   id: string;
   email?: string;
   role?: string;
+  roles?: string[];
+  departmentId?: string;
+  isSuperAdmin?: boolean;
 }
 
 // Extend the base Socket interface to include your custom 'user' property
@@ -17,13 +20,29 @@ export interface AuthenticatedSocket extends Socket {
   user?: DecodedToken;
 }
 
-// Middleware for socket authentication
+/**
+ * Parses raw Cookie header string into key-value map.
+ */
+const parseCookies = (cookieString?: string): Record<string, string> => {
+  if (!cookieString) return {};
+  return cookieString.split(";").reduce((acc, cookie) => {
+    const [name, val] = cookie.trim().split("=");
+    if (name && val) acc[name] = decodeURIComponent(val);
+    return acc;
+  }, {} as Record<string, string>);
+};
+
+// Middleware for socket authentication supporting Auth object, Query param, Bearer header, and HTTP-only cookie
 const socketAuthMiddleware = (socket: AuthenticatedSocket, next: (err?: Error) => void) => {
   try {
+    const cookies = parseCookies(socket.handshake.headers?.cookie);
+    const authHeader = socket.handshake.headers?.authorization;
+
     const token =
       socket.handshake.auth?.token ||
       socket.handshake.query?.token ||
-      socket.handshake.headers?.authorization?.split(" ")[1];
+      (authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader) ||
+      cookies["accessToken"];
 
     if (!token) {
       return next(new Error("Unauthorized: No token provided"));
@@ -31,7 +50,7 @@ const socketAuthMiddleware = (socket: AuthenticatedSocket, next: (err?: Error) =
 
     // Verify token
     const decoded = jwtHelpers.verifyToken(token, env.JWT_SECRET) as DecodedToken;
-    
+
     // Attach user to socket
     socket.user = decoded;
 
@@ -50,11 +69,10 @@ export const initializeSocket = (server: HTTPServer): Server => {
     },
   });
 
-  // Apply middleware (type assertion needed here due to how Socket.io types its middleware)
+  // Apply middleware
   io.use(socketAuthMiddleware as any);
 
   io.on("connection", (socket: AuthenticatedSocket) => {
-    // Safety check in case middleware didn't attach user for some reason
     if (!socket.user) {
       socket.disconnect();
       return;
@@ -63,19 +81,40 @@ export const initializeSocket = (server: HTTPServer): Server => {
     const user = socket.user;
     const userRoom = `user:${user.id}`;
 
-    // Better logging with socket.id
     console.log(`[Socket] User connected: ${user.id} (Socket ID: ${socket.id})`);
 
-    // Auto join user room
+    // Auto join personal user room
     socket.join(userRoom);
 
-    // Optional manual join/leave
-    socket.on("join", () => {
-      socket.join(userRoom);
+    // Auto join role-based rooms
+    if (Array.isArray(user.roles)) {
+      user.roles.forEach((role) => {
+        socket.join(`role:${role}`);
+      });
+    } else if (user.role) {
+      socket.join(`role:${user.role}`);
+    }
+
+    // Auto join department room
+    if (user.departmentId) {
+      socket.join(`dept:${user.departmentId}`);
+    }
+
+    // Manual join/leave handlers
+    socket.on("join", (customRoom?: string) => {
+      if (customRoom) {
+        socket.join(customRoom);
+      } else {
+        socket.join(userRoom);
+      }
     });
 
-    socket.on("leave", () => {
-      socket.leave(userRoom);
+    socket.on("leave", (customRoom?: string) => {
+      if (customRoom) {
+        socket.leave(customRoom);
+      } else {
+        socket.leave(userRoom);
+      }
     });
 
     socket.on("disconnect", (reason) => {
@@ -86,9 +125,72 @@ export const initializeSocket = (server: HTTPServer): Server => {
   return io;
 };
 
-export const getIO = (): Server => {
-  if (!io) {
-    throw new Error("Socket.io has not been initialized. Please call initializeSocket first.");
-  }
+export const getIO = (): Server | null => {
   return io;
+};
+
+/**
+ * Emits an event to a single user room.
+ */
+export const emitToUser = (userId: string, event: string, data: any): void => {
+  try {
+    if (io) {
+      io.to(`user:${userId}`).emit(event, data);
+    }
+  } catch (error) {
+    console.error(`[Socket] Failed to emit '${event}' to user:${userId}`, error);
+  }
+};
+
+/**
+ * Emits an event to multiple user rooms simultaneously.
+ */
+export const emitToUsers = (userIds: string[], event: string, data: any): void => {
+  try {
+    if (io && userIds.length > 0) {
+      const rooms = userIds.map((id) => `user:${id}`);
+      io.to(rooms).emit(event, data);
+    }
+  } catch (error) {
+    console.error(`[Socket] Failed to emit '${event}' to users`, error);
+  }
+};
+
+/**
+ * Emits an event to all users in a specific role.
+ */
+export const emitToRole = (role: string, event: string, data: any): void => {
+  try {
+    if (io) {
+      io.to(`role:${role}`).emit(event, data);
+    }
+  } catch (error) {
+    console.error(`[Socket] Failed to emit '${event}' to role:${role}`, error);
+  }
+};
+
+/**
+ * Emits an event to all users in a specific department.
+ */
+export const emitToDepartment = (departmentId: string, event: string, data: any): void => {
+  try {
+    if (io) {
+      io.to(`dept:${departmentId}`).emit(event, data);
+    }
+  } catch (error) {
+    console.error(`[Socket] Failed to emit '${event}' to dept:${departmentId}`, error);
+  }
+};
+
+/**
+ * Broadcasts an event to all connected sockets.
+ */
+export const emitToAll = (event: string, data: any): void => {
+  try {
+    if (io) {
+      io.emit(event, data);
+    }
+  } catch (error) {
+    console.error(`[Socket] Failed to broadcast '${event}'`, error);
+  }
 };

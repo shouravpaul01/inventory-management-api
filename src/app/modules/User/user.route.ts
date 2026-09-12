@@ -1,33 +1,64 @@
-import { Router } from "express";
-
+import express from "express";
+import auth from "../../middlewares/auth";
+import checkPermission from "../../middlewares/checkPermission";
+import validateRequest from "../../middlewares/validateRequest";
 import { UserController } from "./user.controller";
 import { UserValidation } from "./user.validation";
-import auth from "../../middlewares/auth";
-import validateRequest from "../../middlewares/validateRequest";
-import { fileUploader } from "../../middlewares/fileUploader";
-import { UserRole } from "@prisma/client";
 
-const router = Router();
+const router = express.Router();
 
-router.get("/me", auth(), UserController.getMe);
+router.post(
+  "/",
+  auth(),
+  checkPermission("user.create"),
+  validateRequest(UserValidation.createUserZodSchema),
+  UserController.createUser
+);
+
+router.get(
+  "/",
+  auth(),
+  checkPermission("user.view"),
+  UserController.getAllUsers
+);
+
+router.get(
+  "/:id",
+  auth(),
+  checkPermission("user.view"),
+  UserController.getUserById
+);
 
 router.patch(
-  "/me",
+  "/:id",
   auth(),
-  fileUploader.single("photo"),
-  validateRequest(UserValidation.UpdateProfile),
-  UserController.updateMe,
+  checkPermission("user.update"),
+  validateRequest(UserValidation.updateUserZodSchema),
+  UserController.updateUser
 );
-router.get("/", auth(UserRole.ADMIN), UserController.getAllUsers);
-
-router.get("/:id", auth(), UserController.getUserById);
 
 router.patch(
   "/:id/status",
-  auth(UserRole.ADMIN),
-  validateRequest(UserValidation.UpdateUserStatus),
-  UserController.updateUserStatus,
+  auth(),
+  checkPermission("user.status"),
+  validateRequest(UserValidation.updateUserStatusZodSchema),
+  UserController.updateUserStatus
 );
-router.delete("/me", auth(), UserController.deleteMe);
+
+router.post(
+  "/:id/roles",
+  auth(),
+  checkPermission("user.manage_roles"),
+  validateRequest(UserValidation.assignUserRolesZodSchema),
+  UserController.assignUserRoles
+);
+
+router.post(
+  "/:id/permissions",
+  auth(),
+  checkPermission("user.override_permission"),
+  validateRequest(UserValidation.overrideUserPermissionsZodSchema),
+  UserController.overrideUserPermissions
+);
 
 export const UserRoutes = router;

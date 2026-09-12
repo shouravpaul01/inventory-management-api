@@ -4,6 +4,7 @@ import app from "./app";
 import { initializeSocket } from "./shared/socket";
 import redis from "./shared/redis";
 import { env } from "./config/env.config";
+import "./services/Email/email.worker";
 const httpServer = createServer(app);
 initializeSocket(httpServer);
 // Main function to start the server

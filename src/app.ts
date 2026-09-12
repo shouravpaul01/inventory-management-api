@@ -11,6 +11,7 @@ import GlobalErrorHandler from "./app/middlewares/globalErrorHandler";
 import { AppBodyTemplate } from "./utils/BodyTemplate";
 import morgan from "morgan";
 import { globalTokenLimiter } from "./app/middlewares/tokenBucketLimiter";
+import { RequestContext } from "./helpers/requestContext";
 
 const app: Application = express();
 
@@ -46,6 +47,21 @@ app.use(helmet());
 app.use(hpp());
 app.use(cors(corsOptions));
 app.use(globalTokenLimiter);
+
+// ─── Request Context (AsyncLocalStorage) ──────────────────────────────────────
+// Captures client IP and userAgent across deep async call stacks automatically.
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  const forwarded = req.headers["x-forwarded-for"];
+  const ipAddress =
+    typeof forwarded === "string"
+      ? forwarded.split(",")[0].trim()
+      : req.ip || req.socket.remoteAddress;
+  const userAgent = (req.headers["user-agent"] as string) || undefined;
+
+  RequestContext.run({ ipAddress: ipAddress || undefined, userAgent }, () => {
+    next();
+  });
+});
 
 // ─── General Middleware ───────────────────────────────────────────────────────
 // cookieParser uses a secret for signed-cookie integrity.
