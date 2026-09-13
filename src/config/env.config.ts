@@ -16,10 +16,6 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid URL"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
 
-  // Stripe
-  STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
-  STRIPE_WEBHOOK_SECRET: z.string().min(1, "STRIPE_WEBHOOK_SECRET is required"),
-
 
   // JWT
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
@@ -40,12 +36,24 @@ const envSchema = z.object({
   EMAIL: z.string().email("EMAIL must be a valid email address"),
   APP_PASS: z.string().min(1, "APP_PASS is required"),
 
-  // AWS S3
-  AWS_S3_REGION: z.string().min(1, " AWS_S3_REGION is required"),
-  AWS_S3_ENDPOINT: z.string().url("AWS_S3_ENDPOINT must be a valid URL"),
-  AWS_S3_ACCESS_KEY: z.string().min(1, "AWS_S3_ACCESS_KEY is required"),
-  AWS_S3_SECRET_KEY: z.string().min(1, "AWS_S3_SECRET_KEY is required"),
-  AWS_S3_BUCKET: z.string().min(1, "AWS_S3_BUCKET is required"),
+  // cloudinary
+  CLOUDINARY_CLOUD_NAME: z
+    .string()
+    .min(1, "CLOUDINARY_CLOUD_NAME is required"),
+
+  CLOUDINARY_API_KEY: z
+    .string()
+    .min(1, "CLOUDINARY_API_KEY is required"),
+
+  CLOUDINARY_API_SECRET: z
+    .string()
+    .min(1, "CLOUDINARY_API_SECRET is required"),
+
+  CLOUDINARY_URL: z
+    .string()
+    .url("CLOUDINARY_URL must be a valid URL")
+    .optional(),
+    EPHE_PATH: z.string().default("./ephe"),
 
 
 

@@ -1,74 +1,45 @@
-import { Router } from "express";
+import express from "express";
+import auth from "../../middlewares/auth";
 import validateRequest from "../../middlewares/validateRequest";
+import { AuthController } from "./auth.controller";
 import { AuthValidations } from "./auth.validation";
-import { AuthControllers } from "./auth.controller";
-import {
-  authTokenLimiter,
-  otpTokenLimiter,
-} from "../../middlewares/tokenBucketLimiter";
 
-const router = Router();
+const router = express.Router();
 
-// ─── Registration & Email Verification ───────────────────────────────────────
-// authLimiter: prevents bulk account creation / registration spam
-router.post(
-  "/register",
-  authTokenLimiter,
-  validateRequest(AuthValidations.register),
-  AuthControllers.register,
-);
-
-// otpLimiter: prevents OTP enumeration — 3 attempts per 10 min
-router.post(
-  "/verify-otp",
-  otpTokenLimiter,
-  validateRequest(AuthValidations.verifyOtp),
-  AuthControllers.verifyOtp,
-);
-
-// ─── Login / Logout ───────────────────────────────────────────────────────────
-// authLimiter: prevents brute-force password attacks — 5 failed attempts per 15 min
 router.post(
   "/login",
-  authTokenLimiter,
   validateRequest(AuthValidations.login),
-  AuthControllers.login,
+  AuthController.login
 );
 
-// Logout is safe — no rate limiting needed
-router.post("/logout", AuthControllers.logout);
+router.get("/me", auth(), AuthController.getMe);
 
-// ─── Token Refresh ────────────────────────────────────────────────────────────
-// No strict limit needed — tokens are short-lived and refresh is passive
+router.post("/refresh-token", AuthController.refreshToken);
+
 router.post(
-  "/refresh-token",
-  validateRequest(AuthValidations.refreshToken),
-  AuthControllers.refreshToken,
+  "/change-password",
+  auth(),
+  AuthController.changePassword
 );
 
-// ─── Password Reset Flow ──────────────────────────────────────────────────────
-// authLimiter: prevents email spam / account enumeration via forgot-password
 router.post(
   "/forgot-password",
-  authTokenLimiter,
   validateRequest(AuthValidations.forgotPassword),
-  AuthControllers.forgotPassword,
+  AuthController.forgotPassword
 );
 
-// otpLimiter: prevents reset OTP brute-force — 3 attempts per 10 min
 router.post(
   "/verify-reset-otp",
-  otpTokenLimiter,
   validateRequest(AuthValidations.verifyResetOtp),
-  AuthControllers.verifyResetOtp,
+  AuthController.verifyResetOtp
 );
 
-// authLimiter: limits how many times someone can submit a new password
 router.post(
   "/reset-password",
-  authTokenLimiter,
   validateRequest(AuthValidations.resetPassword),
-  AuthControllers.resetPassword,
+  AuthController.resetPassword
 );
+
+router.post("/logout", AuthController.logout);
 
 export const AuthRoutes = router;

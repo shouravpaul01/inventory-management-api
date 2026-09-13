@@ -2,81 +2,47 @@ import { Request, Response } from "express";
 import httpStatus from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
-import { AuthServices } from "./auth.service";
-
-const register = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.register(req.body);
-  sendResponse(res, {
-    statusCode: httpStatus.CREATED,
-    success: true,
-    message: "Registration successful. Please check your email for the OTP.",
-    data: result,
-  });
-});
-
-const verifyOtp = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.verifyOtp(req.body, res);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Email verified successfully.",
-    data: result,
-  });
-});
+import { AuthService } from "./auth.service";
 
 const login = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.login(req.body, res);
+  const result = await AuthService.login(req.body, res);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Login successful.",
+    message: "Logged in successfully",
     data: result,
   });
 });
 
-const forgotPassword = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.forgotPassword(req.body);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: result.message,
-    data: null,
-  });
-});
+const getMe = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const result = await AuthService.getMe(userId!);
 
-const verifyResetOtp = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.verifyResetOtp(req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "OTP verified. Use the reset token to set a new password.",
+    message: "User profile fetched successfully",
     data: result,
-  });
-});
-
-const resetPassword = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthServices.resetPassword(req.body);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: result.message,
-    data: null,
   });
 });
 
 const refreshToken = catchAsync(async (req: Request, res: Response) => {
-  const token = req.cookies?.refreshToken;
-  const result = await AuthServices.refreshToken(token, res);
+  const token = req.cookies?.refreshToken || req.body?.refreshToken;
+  const result = await AuthService.refreshToken(token, res);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: "Access token refreshed.",
+    message: "Access token refreshed successfully",
     data: result,
   });
 });
 
-const logout = catchAsync(async (req: Request, res: Response) => {
-  const result = AuthServices.logout(res);
+const changePassword = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const result = await AuthService.changePassword(userId!, req.body);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -85,13 +51,58 @@ const logout = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-export const AuthControllers = {
-  register,
-  verifyOtp,
+const logout = catchAsync(async (req: Request, res: Response) => {
+  res.clearCookie("accessToken");
+  res.clearCookie("refreshToken");
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Logged out successfully",
+    data: null,
+  });
+});
+
+const forgotPassword = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.forgotPassword(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: { expiresIn: result.expiresIn },
+  });
+});
+
+const verifyResetOtp = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.verifyResetOtp(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: { resetToken: result.resetToken, expiresIn: result.expiresIn },
+  });
+});
+
+const resetPassword = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.resetPassword(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: null,
+  });
+});
+
+export const AuthController = {
   login,
+  getMe,
+  refreshToken,
+  changePassword,
+  logout,
   forgotPassword,
   verifyResetOtp,
   resetPassword,
-  refreshToken,
-  logout,
 };

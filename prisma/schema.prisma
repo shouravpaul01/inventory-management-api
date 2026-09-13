@@ -1,7 +1,5 @@
-
 generator client {
   provider = "prisma-client-js"
- 
 }
 
 datasource db {
@@ -9,39 +7,392 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PermissionEffect {
+  GRANT
+  REVOKE
+}
+
+enum ApprovalRequirement {
+  REQUIRED
+  NOT_REQUIRED
+}
+
+enum ApprovalScope {
+  SYSTEM
+  ROLE
+  USER
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+  RETURN_FOR_CORRECTION
+}
+
+enum ApprovalEntityType {
+  USER
+  ROLE
+  DEPARTMENT
+
+  BUILDING
+  FLOOR
+  ROOM
+  ROOM_TYPE
+  STOCK_LOCATION
+
+  CATEGORY
+  INVENTORY_ITEM
+  INVENTORY_UNIT
+  STOCK_ADJUSTMENT
+  STOCK_TRANSFER
+
+  REQUISITION
+  DISTRIBUTION
+  RETURN
+  DELIVERY
+  CODE_SEQUENCE
+
+  OTHER
+}
+
+enum RoomStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum StockTrackingType {
+  SERIALIZED
+  BULK
+}
+
+enum IssuePolicy {
+  PERMANENT
+  TEMPORARY
+  GIFT
+}
+
+enum InventoryUnitStatus {
+  IN_STOCK
+  RESERVED
+  ISSUED
+  RETURN_PENDING
+  RETURNED
+  DAMAGED
+  LOST
+  DISPOSED
+  GIFTED
+  MAINTENANCE
+}
+
+enum ConditionStatus {
+  NEW
+  GOOD
+  FAIR
+  DAMAGED
+  LOST
+  DISPOSED
+}
+
+enum RequestType {
+  REQUISITION
+  ORDER
+}
+
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+  CLOSED
+}
+
+enum RequestLineStatus {
+  PENDING
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  PARTIALLY_ISSUED
+  ISSUED
+  CLOSED
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+enum IssueMode {
+  PERMANENT
+  TEMPORARY
+  GIFT
+}
+
+enum HandoverMethod {
+  SELF_COLLECTION
+  DELIVERED_BY_STAFF
+  COURIER
+  OTHER
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  RECEIVED
+  REJECTED
+  FAILED
+}
+
+enum ReturnStatus {
+  NOT_REQUIRED
+  EXPECTED
+  PARTIALLY_RETURNED
+  RETURNED
+  OVERDUE
+  LOST
+  CANCELLED
+}
+
+enum ReturnCondition {
+  SAME
+  GOOD
+  DAMAGED
+  LOST
+  NEEDS_REPAIR
+}
+
+enum StockMovementType {
+  PURCHASE
+  INITIAL_STOCK
+  STOCK_IN
+  STOCK_OUT
+
+  TRANSFER
+  DISTRIBUTION
+  RETURN
+
+  RESERVATION
+  RESERVATION_RELEASE
+
+  ADJUSTMENT
+  DAMAGE
+  LOSS
+  DISPOSAL
+  GIFT
+}
+
+enum LocationType {
+  BUILDING
+  FLOOR
+  ROOM
+  STORE
+  WAREHOUSE
+  SHELF
+  RACK
+  CABINET
+  OTHER
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  PASSWORD_CHANGE
+  PASSWORD_RESET
+  ACCOUNT_LOCK
+  ACCOUNT_UNLOCK
+
+  SUBMIT
+  APPROVE
+  REJECT
+
+  DISTRIBUTE
+  RETURN
+  TRANSFER
+
+  STOCK_IN
+  STOCK_OUT
+  ADJUST
+
+  EXPORT
+  IMPORT
+}
+
+enum NotificationType {
+  SYSTEM
+  APPROVAL
+  REQUISITION
+  DISTRIBUTION
+  RETURN
+  DELIVERY
+  STOCK
+  ALERT
+}
+
+// ============================================================
+// DEPARTMENT
+// ============================================================
+
+model Department {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  name   String
-  email  String     @unique
-  phone  String?    @unique
-  photo  String?
-  role   UserRole   @default(USER)
-  status UserStatus @default(ACTIVE)
+  name        String
+  code        String  @unique
+  description String?
 
-  isEmailVerified Boolean @default(false)
-  isPhoneVerified Boolean @default(false)
-  isDeleted       Boolean @default(false)
-
-  // ── Relations ─────────────────────────────────────
-  auth UserAuth?
+  users User[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@map("departments")
+}
+
+// ============================================================
+// USER
+// BUSINESS / PROFILE DATA
+// ============================================================
+
+model User {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  employeeId String @unique
+  username   String @unique
+  email      String @unique
+
+  firstName String
+  lastName  String?
+  phone     String?
+
+  status UserStatus @default(ACTIVE)
+
+  // Initial system account
+  isSuperAdmin Boolean @default(false)
+
+  departmentId String     @db.ObjectId
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // ------------------------------------------------------------
+  // Authentication
+  // ------------------------------------------------------------
+
+  auth UserAuth?
+
+  // ------------------------------------------------------------
+  // User Creator Hierarchy
+  // ------------------------------------------------------------
+
+  createdById String? @db.ObjectId
+  createdBy   User?   @relation("UserCreator", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  createdUsers User[] @relation("UserCreator")
+
+  // ------------------------------------------------------------
+  // RBAC
+  // ------------------------------------------------------------
+
+  roles UserRole[]
+
+  permissions UserPermissionOverride[]
+
+  // ------------------------------------------------------------
+  // Requests
+  // ------------------------------------------------------------
+
+  requests Requisition[] @relation("Requester")
+
+  // ------------------------------------------------------------
+  // Approvals
+  // ------------------------------------------------------------
+
+  approvalRequestsCreated ApprovalRequest[] @relation("ApprovalRequestCreator")
+
+  approvalRecords ApprovalRecord[] @relation("ApprovalActor")
+
+  // ------------------------------------------------------------
+  // Distribution
+  // ------------------------------------------------------------
+
+  distributionsIssued Distribution[] @relation("DistributionIssuer")
+
+  receivedDistributions Distribution[] @relation("DistributionReceiver")
+
+  // ------------------------------------------------------------
+  // Returns
+  // ------------------------------------------------------------
+
+  returnsProcessed ReturnTransaction[] @relation("ReturnProcessor")
+
+  // ------------------------------------------------------------
+  // Audit / Notifications
+  // ------------------------------------------------------------
+
+  auditLogs AuditLog[]
+
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([departmentId])
+  @@index([status])
+  @@index([isSuperAdmin])
   @@map("users")
 }
+
+// ============================================================
+// USER AUTH
+
+// ONLY LOGIN / SECURITY INFORMATION
+// ============================================================
 
 model UserAuth {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  password    String
-  passwordChangedAt DateTime?
-  lastLoginAt       DateTime?
-
-  // ── Relation ──────────────────────────────────────
   userId String @unique @db.ObjectId
-  user   User   @relation(fields: [userId], references: [id])
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  password String
+
+  passwordChangedAt DateTime?
+
+  lastLoginAt DateTime?
+
+  failedLoginCount Int @default(0)
+
+  lockedUntil DateTime?
+
+  emailVerifiedAt DateTime?
+
+  passwordExpiresAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -49,12 +400,1121 @@ model UserAuth {
   @@map("user_auths")
 }
 
-enum UserRole {
-  USER
-  ADMIN
+// ============================================================
+// ROLE
+// ============================================================
+
+model Role {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  name        String
+  code        String  @unique
+  description String?
+
+  isSystemRole Boolean @default(false)
+
+  users UserRole[]
+
+  permissions RolePermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
 }
 
-enum UserStatus {
-  ACTIVE
-  BLOCKED
+// ============================================================
+// USER ROLE
+// ============================================================
+
+model UserRole {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  roleId String @db.ObjectId
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  assignedById String? @db.ObjectId
+
+  assignedAt DateTime @default(now())
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+// ============================================================
+// PERMISSION
+// ============================================================
+
+model Permission {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  code        String  @unique
+  name        String
+  module      String
+  description String?
+
+  roles RolePermission[]
+
+  userOverrides UserPermissionOverride[]
+
+  approvalPolicies ApprovalPolicy[]
+
+  createdAt DateTime @default(now())
+
+  @@index([module])
+  @@map("permissions")
+}
+
+// ============================================================
+// ROLE PERMISSION
+// ============================================================
+
+model RolePermission {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  roleId String @db.ObjectId
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  permissionId String @db.ObjectId
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  createdAt DateTime @default(now())
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================================
+// USER PERMISSION OVERRIDE
+// ============================================================
+
+model UserPermissionOverride {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String @db.ObjectId
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  permissionId String @db.ObjectId
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  effect PermissionEffect
+
+  assignedById String? @db.ObjectId
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+  @@index([permissionId])
+  @@map("user_permission_overrides")
+}
+
+// ============================================================
+// APPROVAL POLICY
+//
+// Defines whether an ACTION requires approval.
+// Priority:
+// USER > ROLE > SYSTEM
+// ============================================================
+
+model ApprovalPolicy {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  permissionId String @db.ObjectId
+
+  permission  Permission          @relation(fields: [permissionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  requirement ApprovalRequirement @default(REQUIRED)
+
+  scope ApprovalScope @default(SYSTEM)
+
+  roleId String? @db.ObjectId
+
+  userId String? @db.ObjectId
+
+  // Optional conditional rule
+  condition Json?
+
+  // Number of approval levels required
+  approvalLevelCount Int @default(1)
+
+  // Can the requester approve own action?
+  allowSelfApproval Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  createdById String? @db.ObjectId
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([permissionId])
+  @@index([scope])
+  @@index([roleId])
+  @@index([userId])
+  @@index([isActive])
+  @@map("approval_policies")
+}
+
+// ============================================================
+// GENERIC APPROVAL REQUEST
+//
+// Any operation can create an approval request.
+// ============================================================
+
+model ApprovalRequest {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  requestNumber String @unique
+
+  entityType ApprovalEntityType
+
+  entityId String
+
+  permissionCode String
+
+  requestedById String @db.ObjectId
+
+  requestedBy User @relation("ApprovalRequestCreator", fields: [requestedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  status ApprovalStatus @default(PENDING)
+
+  currentLevel Int @default(1)
+
+  totalLevels Int @default(1)
+
+  reason String?
+
+  metadata Json?
+
+  records ApprovalRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([entityType, entityId])
+  @@index([requestedById])
+  @@index([status])
+  @@index([permissionCode])
+  @@map("approval_requests")
+}
+
+// ============================================================
+// APPROVAL RECORD
+// EACH LEVEL / APPROVER DECISION
+// ============================================================
+
+model ApprovalRecord {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  approvalRequestId String @db.ObjectId
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  level Int
+
+  approverRoleId String? @db.ObjectId
+
+  approverId String? @db.ObjectId
+
+  approver User? @relation("ApprovalActor", fields: [approverId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  status ApprovalStatus @default(PENDING)
+
+  decision ApprovalDecision?
+
+  comments String?
+
+  actedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([approvalRequestId])
+  @@index([approverId])
+  @@index([approverRoleId])
+  @@index([status])
+  @@map("approval_records")
+}
+
+// ============================================================
+// BUILDING
+// ============================================================
+
+model Building {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  name        String
+  code        String  @unique
+  description String?
+
+  address String?
+
+  imageUrl      String?
+  imagePublicId String?
+
+  floors Floor[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("buildings")
+}
+
+// ============================================================
+// FLOOR
+// ============================================================
+
+model Floor {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  buildingId String @db.ObjectId
+
+  building Building @relation(fields: [buildingId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  name String
+  code String
+
+  floorNumber Int?
+
+  imageUrl      String?
+  imagePublicId String?
+
+  rooms Room[]
+
+  locations StockLocation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([buildingId])
+  @@index([code])
+  @@map("floors")
+}
+
+// ============================================================
+// ROOM TYPE
+// ============================================================
+
+model RoomType {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  name String
+  code String @unique
+
+  description String?
+
+  rooms Room[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("room_types")
+}
+
+// ============================================================
+// ROOM
+// ============================================================
+
+model Room {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  floorId String @db.ObjectId
+
+  floor Floor @relation(fields: [floorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  roomTypeId String? @db.ObjectId
+
+  roomType RoomType? @relation(fields: [roomTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  name String
+  code String @unique
+
+  capacity Int?
+
+  description String?
+
+  imageUrl      String?
+  imagePublicId String?
+
+  status RoomStatus @default(ACTIVE)
+
+  locations StockLocation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([floorId])
+  @@index([roomTypeId])
+  @@map("rooms")
+}
+
+// ============================================================
+// STOCK LOCATION
+//
+// Actual place where stock is stored.
+// Example:
+// Main Store
+// Rack A
+// Shelf 2
+// Cabinet B
+// ============================================================
+
+model StockLocation {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  name String
+  code String @unique
+
+  type LocationType
+
+  description String?
+
+  imageUrl      String?
+  imagePublicId String?
+
+  buildingId String? @db.ObjectId
+
+  floorId String? @db.ObjectId
+
+  roomId String? @db.ObjectId
+
+  floor Floor? @relation(fields: [floorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  room Room? @relation(fields: [roomId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  stockBalances StockBalance[]
+
+  inventoryUnits InventoryUnit[]
+
+  movementsFrom StockMovement[] @relation("MovementFromLocation")
+
+  movementsTo StockMovement[] @relation("MovementToLocation")
+
+  distributionLocations DistributionLocation[]
+
+  returnLocations ReturnLocation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([buildingId])
+  @@index([floorId])
+  @@index([roomId])
+  @@index([type])
+  @@map("stock_locations")
+}
+
+// ============================================================
+// CATEGORY
+// ============================================================
+
+model Category {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  name String
+  code String @unique
+
+  description String?
+
+  parentId String? @db.ObjectId
+
+  parent Category? @relation("CategoryTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  children Category[] @relation("CategoryTree")
+
+  inventoryItems InventoryItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+// ============================================================
+// INVENTORY ITEM
+//
+// Master definition / catalog.
+// ============================================================
+
+model InventoryItem {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  name String
+
+  code String @unique
+
+  sku String? @unique
+
+  description String?
+
+  imageUrl      String?
+  imagePublicId String?
+
+  categoryId String @db.ObjectId
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  brand String?
+
+  model String?
+
+  trackingType StockTrackingType
+
+  isReturnable Boolean @default(false)
+
+  defaultIssuePolicy IssuePolicy @default(PERMANENT)
+
+  unitName String @default("Piece")
+
+  minimumStock Int @default(0)
+
+  reorderLevel Int @default(0)
+
+  isActive Boolean @default(true)
+
+  units InventoryUnit[]
+
+  stockBalances StockBalance[]
+
+  requisitionLines RequisitionLine[]
+
+  distributionLines DistributionLine[]
+
+  returnLines ReturnLine[]
+
+  movements StockMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([trackingType])
+  @@index([isReturnable])
+  @@index([isActive])
+  @@map("inventory_items")
+}
+
+// ============================================================
+// CODE SEQUENCE
+// ============================================================
+
+model CodeSequence {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  name String
+
+  code String @unique
+
+  prefix String
+
+  separator String @default("-")
+
+  currentNumber Int @default(0)
+
+  startNumber Int @default(1)
+
+  paddingLength Int @default(6)
+
+  yearIncluded Boolean @default(false)
+
+  monthIncluded Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  createdById String? @db.ObjectId
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("code_sequences")
+}
+
+// ============================================================
+// SERIALIZED INVENTORY UNIT
+//
+// One physical piece.
+// ============================================================
+
+model InventoryUnit {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  inventoryItemId String @db.ObjectId
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  uniqueCode String @unique
+
+  serialNumber String?
+
+  barcode String?
+
+  qrValue String?
+
+  status InventoryUnitStatus @default(IN_STOCK)
+
+  condition ConditionStatus @default(NEW)
+
+  locationId String? @db.ObjectId
+
+  location StockLocation? @relation(fields: [locationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  currentHolderId String? @db.ObjectId
+
+  purchaseDate DateTime?
+
+  warrantyEndDate DateTime?
+
+  notes String?
+
+  distributionLines DistributionLine[]
+
+  returnLines ReturnLine[]
+
+  movements StockMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([inventoryItemId])
+  @@index([locationId])
+  @@index([status])
+  @@index([currentHolderId])
+  @@index([serialNumber])
+  @@index([barcode])
+  @@map("inventory_units")
+}
+
+// ============================================================
+// BULK STOCK BALANCE
+// ============================================================
+
+model StockBalance {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  inventoryItemId String @db.ObjectId
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  locationId String @db.ObjectId
+
+  location StockLocation @relation(fields: [locationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  quantity Int @default(0)
+
+  reservedQuantity Int @default(0)
+
+  availableQuantity Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([inventoryItemId, locationId])
+  @@index([inventoryItemId])
+  @@index([locationId])
+  @@map("stock_balances")
+}
+
+// ============================================================
+// REQUISITION / ORDER
+// ============================================================
+
+model Requisition {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  requestNumber String @unique
+
+  type RequestType
+
+  requesterId String @db.ObjectId
+
+  requester User @relation("Requester", fields: [requesterId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  departmentId String @db.ObjectId
+
+  purpose String
+
+  remarks String?
+
+  status RequestStatus @default(DRAFT)
+
+  submittedAt DateTime?
+
+  requiredFrom DateTime?
+
+  requiredUntil DateTime?
+
+  isTemporary Boolean @default(false)
+
+  fulfillmentStatus FulfillmentStatus @default(PENDING)
+
+  lines RequisitionLine[]
+
+  distributions Distribution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([requesterId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([type])
+  @@map("requisitions")
+}
+
+// ============================================================
+// REQUISITION LINE
+// ============================================================
+
+model RequisitionLine {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  requisitionId String @db.ObjectId
+
+  requisition Requisition @relation(fields: [requisitionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  inventoryItemId String @db.ObjectId
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  requestedQty Int
+
+  approvedQty Int @default(0)
+
+  issuedQty Int @default(0)
+
+  returnedQty Int @default(0)
+
+  status RequestLineStatus @default(PENDING)
+
+  requestedIssuePolicy IssuePolicy?
+
+  remarks String?
+
+  distributionLines DistributionLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([requisitionId])
+  @@index([inventoryItemId])
+  @@map("requisition_lines")
+}
+
+// ============================================================
+// DISTRIBUTION
+// ============================================================
+
+model Distribution {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  distributionNo String @unique
+
+  requisitionId String @db.ObjectId
+
+  requisition Requisition @relation(fields: [requisitionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  issuedById String @db.ObjectId
+
+  issuedBy User @relation("DistributionIssuer", fields: [issuedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  receiverId String @db.ObjectId
+
+  receiver User @relation("DistributionReceiver", fields: [receiverId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  issueMode IssueMode
+
+  handoverMethod HandoverMethod
+
+  status FulfillmentStatus @default(PENDING)
+
+  expectedReturnAt DateTime?
+
+  deliveredAt DateTime?
+
+  deliveryStatus DeliveryStatus @default(PENDING)
+
+  remarks String?
+
+  lines DistributionLine[]
+
+  locations DistributionLocation[]
+
+  deliveryConfirmation DeliveryConfirmation?
+
+  returnTransactions ReturnTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([requisitionId])
+  @@index([issuedById])
+  @@index([receiverId])
+  @@index([status])
+  @@map("distributions")
+}
+
+// ============================================================
+// DISTRIBUTION LINE
+// ============================================================
+
+model DistributionLine {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  distributionId String @db.ObjectId
+
+  distribution Distribution @relation(fields: [distributionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  requisitionLineId String? @db.ObjectId
+
+  requisitionLine RequisitionLine? @relation(fields: [requisitionLineId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  inventoryItemId String @db.ObjectId
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  inventoryUnitId String? @db.ObjectId
+
+  inventoryUnit InventoryUnit? @relation(fields: [inventoryUnitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  quantity Int
+
+  issueMode IssueMode
+
+  condition ConditionStatus?
+
+  expectedReturnAt DateTime?
+
+  remarks String?
+
+  createdAt DateTime @default(now())
+
+  @@index([distributionId])
+  @@index([requisitionLineId])
+  @@index([inventoryItemId])
+  @@index([inventoryUnitId])
+  @@map("distribution_lines")
+}
+
+// ============================================================
+// DISTRIBUTION LOCATION
+//
+// Which location supplied this distribution.
+// Useful especially for BULK stock.
+// ============================================================
+
+model DistributionLocation {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  distributionId String @db.ObjectId
+
+  distribution Distribution @relation(fields: [distributionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  locationId String @db.ObjectId
+
+  location StockLocation @relation(fields: [locationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  quantity Int
+
+  createdAt DateTime @default(now())
+
+  @@index([distributionId])
+  @@index([locationId])
+  @@map("distribution_locations")
+}
+
+// ============================================================
+// DELIVERY CONFIRMATION
+// ============================================================
+
+model DeliveryConfirmation {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  distributionId String @unique @db.ObjectId
+
+  distribution Distribution @relation(fields: [distributionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  deliveredById String? @db.ObjectId
+
+  receivedById String @db.ObjectId
+
+  deliveryStatus DeliveryStatus
+
+  receivedAt DateTime?
+
+  receiverRemarks String?
+
+  signatureUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([receivedById])
+  @@map("delivery_confirmations")
+}
+
+// ============================================================
+// RETURN TRANSACTION
+// ============================================================
+
+model ReturnTransaction {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  returnNumber String @unique
+
+  distributionId String @db.ObjectId
+
+  distribution Distribution @relation(fields: [distributionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  processedById String @db.ObjectId
+
+  processedBy User @relation("ReturnProcessor", fields: [processedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  status ReturnStatus @default(EXPECTED)
+
+  returnedAt DateTime?
+
+  remarks String?
+
+  lines ReturnLine[]
+
+  locations ReturnLocation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([distributionId])
+  @@index([processedById])
+  @@index([status])
+  @@map("return_transactions")
+}
+
+// ============================================================
+// RETURN LINE
+// ============================================================
+
+model ReturnLine {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  returnId String @db.ObjectId
+
+  returnTransaction ReturnTransaction @relation(fields: [returnId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  inventoryItemId String @db.ObjectId
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  inventoryUnitId String? @db.ObjectId
+
+  inventoryUnit InventoryUnit? @relation(fields: [inventoryUnitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  quantity Int
+
+  condition ReturnCondition
+
+  remarks String?
+
+  createdAt DateTime @default(now())
+
+  @@index([returnId])
+  @@index([inventoryItemId])
+  @@index([inventoryUnitId])
+  @@map("return_lines")
+}
+
+// ============================================================
+// RETURN LOCATION
+//
+// Supports splitting returned stock into multiple locations.
+// Example:
+// 2 laptops → Rack A
+// 3 laptops → Rack B
+// ============================================================
+
+model ReturnLocation {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  returnId String @db.ObjectId
+
+  returnTransaction ReturnTransaction @relation(fields: [returnId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  locationId String @db.ObjectId
+
+  location StockLocation @relation(fields: [locationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  quantity Int
+
+  createdAt DateTime @default(now())
+
+  @@index([returnId])
+  @@index([locationId])
+  @@map("return_locations")
+}
+
+// ============================================================
+// STOCK MOVEMENT / LEDGER
+// ============================================================
+
+model StockMovement {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  movementNumber String @unique
+
+  type StockMovementType
+
+  inventoryItemId String @db.ObjectId
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  inventoryUnitId String? @db.ObjectId
+
+  inventoryUnit InventoryUnit? @relation(fields: [inventoryUnitId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  quantity Int
+
+  fromLocationId String? @db.ObjectId
+
+  fromLocation StockLocation? @relation("MovementFromLocation", fields: [fromLocationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  toLocationId String? @db.ObjectId
+
+  toLocation StockLocation? @relation("MovementToLocation", fields: [toLocationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  performedById String @db.ObjectId
+
+  referenceType String?
+
+  referenceId String? @db.ObjectId
+
+  notes String?
+
+  photos StockMovementPhoto[]
+
+  createdAt DateTime @default(now())
+
+  @@index([inventoryItemId])
+  @@index([inventoryUnitId])
+  @@index([fromLocationId])
+  @@index([toLocationId])
+  @@index([performedById])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+// ============================================================
+// STOCK MOVEMENT PHOTO
+//
+// Evidence photo for a particular movement.
+// NOT the master inventory image.
+// ============================================================
+
+model StockMovementPhoto {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  stockMovementId String @db.ObjectId
+
+  stockMovement StockMovement @relation(fields: [stockMovementId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  imageUrl String
+
+  imagePublicId String?
+
+  caption String?
+
+  createdAt DateTime @default(now())
+
+  @@index([stockMovementId])
+  @@map("stock_movement_photos")
+}
+
+// ============================================================
+// AUDIT LOG
+// ============================================================
+
+model AuditLog {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  actorId String? @db.ObjectId
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  action AuditAction
+
+  module String
+
+  entityType String
+
+  entityId String
+
+  beforeData Json?
+
+  afterData Json?
+
+  approvalRequired Boolean @default(false)
+
+  approvalRequestId String? @db.ObjectId
+
+  approvalBypassed Boolean @default(false)
+
+  bypassReason String?
+
+  metadata Json?
+
+  ipAddress String?
+
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([module])
+  @@index([action])
+  @@index([approvalRequestId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// NOTIFICATION
+// ============================================================
+
+model Notification {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String @db.ObjectId
+
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  type NotificationType
+
+  title String
+
+  message String
+
+  referenceType String?
+
+  referenceId String? @db.ObjectId
+
+  isRead Boolean @default(false)
+
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
 }

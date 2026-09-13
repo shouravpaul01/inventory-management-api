@@ -1,47 +1,59 @@
-import { SignOptions } from "jsonwebtoken";
 import { env } from "../../../config/env.config";
 import { jwtHelpers } from "../../../helpers/jwtHelpers";
 import ms, { StringValue } from "ms";
-import { User } from "@prisma/client";
+import { IAuthTokens, IAuthUserTokenPayload } from "./auth.interface";
 
-
-const cookiesDomain = env.NODE_ENV === "production"
-  ? ".app--magic.com"
-  : undefined
-const setTokenCookies = (res: any, user: Partial<User>) => {
+export const setTokenCookies = (
+  res: any,
+  payload: IAuthUserTokenPayload | Record<string, unknown>
+): IAuthTokens => {
   const accessToken = jwtHelpers.generateToken(
-    { ...user },
+    payload,
     env.JWT_SECRET,
-    env.EXPIRES_IN as any,
+    env.EXPIRES_IN as any
   );
 
   const refreshToken = jwtHelpers.generateToken(
-    { user },
+    { id: payload.id },
     env.REFRESH_TOKEN_SECRET!,
-    env.REFRESH_TOKEN_EXPIRES_IN as any,
+    env.REFRESH_TOKEN_EXPIRES_IN as any
   );
 
   const cookieOptions = {
     httpOnly: true,
     secure: env.NODE_ENV === "production",
     sameSite: "lax" as const,
-    domain: cookiesDomain,
     path: "/",
   };
 
-  res.cookie("accessToken", accessToken, {
-    ...cookieOptions,
-    maxAge: ms(env.EXPIRES_IN as StringValue),
-  });
+  if (res && typeof res.cookie === "function") {
+    res.cookie("accessToken", accessToken, {
+      ...cookieOptions,
+      maxAge: ms(env.EXPIRES_IN as StringValue),
+    });
 
-  res.cookie("refreshToken", refreshToken, {
-    ...cookieOptions,
-    maxAge: ms(env.REFRESH_TOKEN_EXPIRES_IN as StringValue),
-  });
+    res.cookie("refreshToken", refreshToken, {
+      ...cookieOptions,
+      maxAge: ms(env.REFRESH_TOKEN_EXPIRES_IN as StringValue),
+    });
+  }
 
   return {
     accessToken,
     refreshToken,
   };
 };
-export const AuthUtils = { setTokenCookies };
+
+export const calculateLockoutExpiry = (minutes = 15): Date => {
+  return new Date(Date.now() + minutes * 60 * 1000);
+};
+
+export const getRemainingLockoutMinutes = (lockedUntil: Date): number => {
+  return Math.ceil((lockedUntil.getTime() - Date.now()) / 60000);
+};
+
+export const AuthUtils = {
+  setTokenCookies,
+  calculateLockoutExpiry,
+  getRemainingLockoutMinutes,
+};
