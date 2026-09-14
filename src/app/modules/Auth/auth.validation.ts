@@ -18,7 +18,7 @@ const verifyOtp = z.object({
 
 const login = z.object({
   body: z.object({
-    email: z.string().email("Valid email is required."),
+    email: z.string().nonempty("Email, username, or employee ID is required."),
     password: z.string().nonempty("Password is required."),
   }),
 });
