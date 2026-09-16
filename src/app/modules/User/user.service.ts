@@ -11,6 +11,7 @@ import {
 import { hashPassword, validateUniqueUserFields } from "./user.utils";
 import { AuditAction } from "@prisma/client";
 import { AuditService } from "../Audit/audit.service";
+import { calculateEffectivePermissions } from "../../../helpers/permissionHelpers";
 
 const createUser = async (
   payload: ICreateUserPayload,
@@ -168,7 +169,12 @@ const getUserById = async (id: string) => {
     throw new ApiError(httpStatus.NOT_FOUND, "User not found!");
   }
 
-  return user;
+  const effectivePermissions = calculateEffectivePermissions(user as any);
+
+  return {
+    ...user,
+    effectivePermissions,
+  };
 };
 
 const updateUser = async (
@@ -292,13 +298,22 @@ const overrideUserPermissions = async (
 ) => {
   await getUserById(userId);
 
-  const permissionIds = overrides.map((o) => o.permissionId);
-  const existingPerms = await prisma.permission.findMany({
-    where: { id: { in: permissionIds } },
-  });
+  // Deduplicate overrides by permissionId (keep latest state)
+  const uniqueOverridesMap = new Map<string, IPermissionOverrideItem>();
+  for (const item of overrides) {
+    uniqueOverridesMap.set(item.permissionId, item);
+  }
+  const uniqueOverrides = Array.from(uniqueOverridesMap.values());
 
-  if (existingPerms.length !== permissionIds.length) {
-    throw new ApiError(httpStatus.BAD_REQUEST, "One or more permission IDs are invalid!");
+  const permissionIds = uniqueOverrides.map((o) => o.permissionId);
+  if (permissionIds.length > 0) {
+    const existingPerms = await prisma.permission.findMany({
+      where: { id: { in: permissionIds } },
+    });
+
+    if (existingPerms.length !== permissionIds.length) {
+      throw new ApiError(httpStatus.BAD_REQUEST, "One or more permission IDs are invalid!");
+    }
   }
 
   // Remove existing overrides
@@ -307,7 +322,7 @@ const overrideUserPermissions = async (
   });
 
   // Create new overrides
-  for (const item of overrides) {
+  for (const item of uniqueOverrides) {
     await prisma.userPermissionOverride.create({
       data: {
         userId,
@@ -323,7 +338,7 @@ const overrideUserPermissions = async (
     entityType: "UserPermissionOverride",
     entityId: userId,
     actorId: assignedById,
-    metadata: { overrides },
+    metadata: { overrides: uniqueOverrides },
   });
 
   return getUserById(userId);
