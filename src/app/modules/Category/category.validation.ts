@@ -5,7 +5,7 @@ const createCategoryZodSchema = z.object({
     name: z.string().min(1, "Category name is required"),
     code: z.string().min(1, "Category code is required").transform((c) => c.toUpperCase()),
     description: z.string().optional(),
-    parentId: z.string().optional(),
+    parentId: z.any().optional(),
   }),
 });
 

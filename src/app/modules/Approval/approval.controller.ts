@@ -2,11 +2,26 @@ import { Request, Response } from "express";
 import httpStatus from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
+import ApiError from "../../../errors/ApiErrors";
 import { ApprovalService } from "./approval.service";
 
 const getAllApprovalRequests = catchAsync(
   async (req: Request, res: Response) => {
-    const result = await ApprovalService.getAllApprovalRequests(req.query);
+    const user = req.user!;
+    const query: Record<string, unknown> = { ...req.query };
+
+    // Check if user has global approval review rights
+    const hasGlobalView =
+      user.isSuperAdmin ||
+      user.permissions?.includes("approval.view") ||
+      user.permissions?.includes("requisition.approve");
+
+    // Regular users can only view their own submissions
+    if (!hasGlobalView) {
+      query.requestedById = user.id;
+    }
+
+    const result = await ApprovalService.getAllApprovalRequests(query);
 
     sendResponse(res, {
       statusCode: httpStatus.OK,
@@ -21,7 +36,20 @@ const getAllApprovalRequests = catchAsync(
 const getApprovalRequestById = catchAsync(
   async (req: Request, res: Response) => {
     const requestId = req.params.id as string;
+    const user = req.user!;
     const result = await ApprovalService.getApprovalRequestById(requestId);
+
+    const hasGlobalView =
+      user.isSuperAdmin ||
+      user.permissions?.includes("approval.view") ||
+      user.permissions?.includes("requisition.approve");
+
+    if (!hasGlobalView && result.requestedById !== user.id) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        "You do not have permission to view this approval request"
+      );
+    }
 
     sendResponse(res, {
       statusCode: httpStatus.OK,
@@ -46,6 +74,25 @@ const actionApprovalRequest = catchAsync(
       statusCode: httpStatus.OK,
       success: true,
       message: `Approval request ${req.body.decision.toLowerCase()}d successfully`,
+      data: result,
+    });
+  }
+);
+
+const resubmitApprovalRequest = catchAsync(
+  async (req: Request, res: Response) => {
+    const requestId = req.params.id as string;
+    const user = req.user!;
+    const result = await ApprovalService.resubmitApprovalRequest(
+      requestId,
+      user,
+      req.body
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Approval request corrected and resubmitted successfully for Super Admin review",
       data: result,
     });
   }
@@ -111,13 +158,26 @@ const deletePolicy = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getExemptionSummary = catchAsync(async (req: Request, res: Response) => {
+  const result = await ApprovalService.getExemptionSummary();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Approval exemption summary retrieved successfully",
+    data: result,
+  });
+});
+
 export const ApprovalController = {
   getAllApprovalRequests,
   getApprovalRequestById,
   actionApprovalRequest,
+  resubmitApprovalRequest,
   createPolicy,
   getAllPolicies,
   getPolicyById,
   updatePolicy,
   deletePolicy,
+  getExemptionSummary,
 };

@@ -3,8 +3,19 @@ import {
   ApprovalEntityType,
   ApprovalRequirement,
   ApprovalScope,
+  ApprovalStatus,
 } from "@prisma/client";
 import { IAuthUser } from "../../../interfaces";
+
+export type IApprovalActionType =
+  | "CREATE"
+  | "UPDATE"
+  | "DELETE"
+  | "ADJUST"
+  | "TRANSFER"
+  | "SUBMIT"
+  | "IN"
+  | "OUT";
 
 export interface IApprovalCheckResult {
   required: boolean;
@@ -18,7 +29,7 @@ export interface ICreateApprovalRequestParams {
   entityId: string;
   permissionCode: string;
   requestedBy: IAuthUser;
-  policy: any;
+  policy?: any;
   reason?: string;
   metadata?: Record<string, any>;
 }
@@ -28,10 +39,34 @@ export interface IProcessApprovalDecisionPayload {
   comments?: string;
 }
 
-export interface ICreatePolicyPayload {
+export interface IResubmitApprovalRequestPayload {
+  updatedPayload: Record<string, any>;
+  resubmitReason?: string;
+}
+
+export interface IApprovalInterceptParams<T> {
   permissionCode: string;
+  entityType: ApprovalEntityType;
+  action: IApprovalActionType;
+  entityId?: string;
+  user: IAuthUser;
+  payload: any;
+  summary: string;
+  executeDirectly: () => Promise<T>;
+}
+
+export interface IApprovalInterceptResult<T> {
+  approvalRequired: boolean;
+  bypassed?: boolean;
+  data: T | any;
+  message?: string;
+}
+
+export interface ICreatePolicyPayload {
+  permissionCode?: string;
+  permissionCodes?: string[];
   requirement?: "REQUIRED" | "NOT_REQUIRED";
-  scope?: "SYSTEM" | "ROLE" | "USER";
+  scope?: "ROLE" | "USER" | "SYSTEM";
   roleId?: string;
   userId?: string;
   condition?: any;
@@ -40,7 +75,12 @@ export interface ICreatePolicyPayload {
 }
 
 export interface IUpdatePolicyPayload {
+  permissionCode?: string;
+  permissionCodes?: string[];
   requirement?: "REQUIRED" | "NOT_REQUIRED";
+  scope?: "ROLE" | "USER" | "SYSTEM";
+  roleId?: string | null;
+  userId?: string | null;
   condition?: any;
   approvalLevelCount?: number;
   allowSelfApproval?: boolean;

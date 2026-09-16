@@ -106,6 +106,8 @@ type QueryBuilderOptions = {
 const DEFAULT_EXCLUDED_FIELDS = new Set([
   "searchTerm",
   "sort",
+  "sortBy",
+  "sortOrder",
   "limit",
   "page",
   "fields",
@@ -698,10 +700,23 @@ class QueryBuilder<T = unknown> {
    * are accepted.
    */
   sort() {
-    const rawSort =
+    let rawSort =
       typeof this.query.sort === "string"
         ? this.query.sort
-        : "-createdAt";
+        : undefined;
+
+    if (!rawSort && typeof this.query.sortBy === "string") {
+      const order =
+        typeof this.query.sortOrder === "string" &&
+        this.query.sortOrder.toLowerCase() === "desc"
+          ? "-"
+          : "";
+      rawSort = `${order}${this.query.sortBy}`;
+    }
+
+    if (!rawSort) {
+      rawSort = "-createdAt";
+    }
 
     const requestedFields = rawSort
       .split(",")

@@ -7,18 +7,16 @@ import { ApprovalValidation } from "./approval.validation";
 
 const router = express.Router();
 
-// Requests
+// Requests (Controller scopes to user's own submissions if not reviewer/admin)
 router.get(
   "/requests",
   auth(),
-  checkPermission("approval.view"),
   ApprovalController.getAllApprovalRequests
 );
 
 router.get(
   "/requests/:id",
   auth(),
-  checkPermission("approval.view"),
   ApprovalController.getApprovalRequestById
 );
 
@@ -28,6 +26,21 @@ router.post(
   checkPermission("approval.action"),
   validateRequest(ApprovalValidation.actionApprovalRequestZodSchema),
   ApprovalController.actionApprovalRequest
+);
+
+router.patch(
+  "/requests/:id/resubmit",
+  auth(),
+  validateRequest(ApprovalValidation.resubmitApprovalRequestZodSchema),
+  ApprovalController.resubmitApprovalRequest
+);
+
+// Exemption Summary
+router.get(
+  "/policies/summary/exemptions",
+  auth(),
+  checkPermission("approval.manage_policy"),
+  ApprovalController.getExemptionSummary
 );
 
 // Policies

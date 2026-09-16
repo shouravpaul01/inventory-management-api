@@ -6,6 +6,7 @@ import { generateSequentialCode } from "../../../helpers/sequenceGenerator";
 import { IAuthUser } from "../../../interfaces";
 import {
   ApprovalEntityType,
+  ApprovalStatus,
   AuditAction,
   FulfillmentStatus,
   IssuePolicy,
@@ -147,10 +148,15 @@ const updateRequisition = async (
     throw new ApiError(httpStatus.NOT_FOUND, "Requisition not found!");
   }
 
-  if (existing.status !== RequestStatus.DRAFT) {
+  const editableStatuses: RequestStatus[] = [
+    RequestStatus.DRAFT,
+    RequestStatus.REJECTED,
+  ];
+
+  if (!editableStatuses.includes(existing.status)) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      `Cannot modify requisition in '${existing.status}' status. Only DRAFT requisitions can be edited.`
+      `Cannot modify requisition in '${existing.status}' status. Only DRAFT or REJECTED requisitions can be edited.`
     );
   }
 
@@ -243,10 +249,15 @@ const submitRequisition = async (id: string, user: IAuthUser) => {
     throw new ApiError(httpStatus.NOT_FOUND, "Requisition not found!");
   }
 
-  if (requisition.status !== RequestStatus.DRAFT) {
+  const submittableStatuses: RequestStatus[] = [
+    RequestStatus.DRAFT,
+    RequestStatus.REJECTED,
+  ];
+
+  if (!submittableStatuses.includes(requisition.status)) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      `Cannot submit requisition in '${requisition.status}' status. Only DRAFT requisitions can be submitted.`
+      `Cannot submit requisition in '${requisition.status}' status. Only DRAFT or REJECTED requisitions can be submitted.`
     );
   }
 
@@ -269,21 +280,64 @@ const submitRequisition = async (id: string, user: IAuthUser) => {
   let newStatus: RequestStatus = RequestStatus.SUBMITTED;
   let approvalRequest = null;
 
-  if (approvalCheck.required && approvalCheck.policy) {
+  if (approvalCheck.required) {
     newStatus = RequestStatus.UNDER_REVIEW;
-    approvalRequest = await ApprovalService.createApprovalRequest({
-      entityType: ApprovalEntityType.REQUISITION,
-      entityId: requisition.id,
-      permissionCode: "requisition.submit",
-      requestedBy: user,
-      policy: approvalCheck.policy,
-      reason: "Requisition submission approval workflow",
-      metadata: {
-        requestNumber: requisition.requestNumber,
-        departmentId: requisition.departmentId,
-        lineCount: requisition.lines.length,
+
+    // Check if an existing approval request exists for this requisition (e.g. resubmission after rejection)
+    const existingAppReq = await prisma.approvalRequest.findFirst({
+      where: {
+        entityType: ApprovalEntityType.REQUISITION,
+        entityId: requisition.id,
       },
     });
+
+    if (existingAppReq) {
+      const existingMeta = (existingAppReq.metadata || {}) as Record<string, any>;
+      const revisions = existingMeta.revisionHistory || [];
+      revisions.push({
+        resubmittedAt: new Date().toISOString(),
+        resubmittedBy: user.id,
+        lineCount: requisition.lines.length,
+      });
+
+      approvalRequest = await prisma.approvalRequest.update({
+        where: { id: existingAppReq.id },
+        data: {
+          status: ApprovalStatus.PENDING,
+          currentLevel: 1,
+          metadata: {
+            ...existingMeta,
+            revisionHistory: revisions,
+            lastResubmittedAt: new Date().toISOString(),
+            lineCount: requisition.lines.length,
+          },
+        },
+      });
+
+      // Notify Super Admin of resubmission
+      await NotificationService.notifyRole({
+        roleCode: "SUPER_ADMIN",
+        type: "APPROVAL",
+        title: "Requisition Resubmitted",
+        message: `Requisition '${requisition.requestNumber}' was revised and resubmitted by ${user.firstName} ${user.lastName || ""} for approval.`,
+        referenceType: "ApprovalRequest",
+        referenceId: approvalRequest.id,
+      });
+    } else {
+      approvalRequest = await ApprovalService.createApprovalRequest({
+        entityType: ApprovalEntityType.REQUISITION,
+        entityId: requisition.id,
+        permissionCode: "requisition.submit",
+        requestedBy: user,
+        policy: approvalCheck.policy,
+        reason: "Requisition submission approval workflow",
+        metadata: {
+          requestNumber: requisition.requestNumber,
+          departmentId: requisition.departmentId,
+          lineCount: requisition.lines.length,
+        },
+      });
+    }
   }
 
   const updatedRequisition = await prisma.requisition.update({

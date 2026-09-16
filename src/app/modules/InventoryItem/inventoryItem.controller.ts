@@ -3,21 +3,30 @@ import httpStatus from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
 import { InventoryItemService } from "./inventoryItem.service";
+import { ApprovalInterceptor } from "../Approval/approval.interceptor";
+import { ApprovalEntityType } from "@prisma/client";
 
 // ── Item Handlers ────────────────────────────────────────────
 const createInventoryItem = catchAsync(async (req: Request, res: Response) => {
-  const actorId = req.user?.id;
-  const result = await InventoryItemService.createInventoryItem(
-    req.body,
-    req.file,
-    actorId
-  );
+  const user = req.user!;
+  const result = await ApprovalInterceptor.executeOrIntercept({
+    permissionCode: "inventory.create",
+    entityType: ApprovalEntityType.INVENTORY_ITEM,
+    action: "CREATE",
+    user,
+    payload: req.body,
+    summary: `Create Inventory Item '${req.body.name}' (SKU: ${req.body.sku || "N/A"})`,
+    executeDirectly: () =>
+      InventoryItemService.createInventoryItem(req.body, req.file, user.id),
+  });
 
   sendResponse(res, {
-    statusCode: httpStatus.CREATED,
+    statusCode: result.approvalRequired ? httpStatus.ACCEPTED : httpStatus.CREATED,
     success: true,
-    message: "Inventory item created successfully",
-    data: result,
+    message: result.approvalRequired
+      ? "Inventory item creation submitted for Super Admin approval"
+      : "Inventory item created successfully",
+    data: result.data,
   });
 });
 
@@ -47,32 +56,51 @@ const getInventoryItemById = catchAsync(async (req: Request, res: Response) => {
 
 const updateInventoryItem = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
-  const actorId = req.user?.id;
-  const result = await InventoryItemService.updateInventoryItem(
-    id,
-    req.body,
-    req.file,
-    actorId
-  );
+  const user = req.user!;
+  const result = await ApprovalInterceptor.executeOrIntercept({
+    permissionCode: "inventory.update",
+    entityType: ApprovalEntityType.INVENTORY_ITEM,
+    action: "UPDATE",
+    entityId: id,
+    user,
+    payload: req.body,
+    summary: `Update Inventory Item '${id}'`,
+    executeDirectly: () =>
+      InventoryItemService.updateInventoryItem(id, req.body, req.file, user.id),
+  });
 
   sendResponse(res, {
-    statusCode: httpStatus.OK,
+    statusCode: result.approvalRequired ? httpStatus.ACCEPTED : httpStatus.OK,
     success: true,
-    message: "Inventory item updated successfully",
-    data: result,
+    message: result.approvalRequired
+      ? "Inventory item update submitted for Super Admin approval"
+      : "Inventory item updated successfully",
+    data: result.data,
   });
 });
 
 const deleteInventoryItem = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
-  const actorId = req.user?.id;
-  const result = await InventoryItemService.deleteInventoryItem(id, actorId);
+  const user = req.user!;
+  const result = await ApprovalInterceptor.executeOrIntercept({
+    permissionCode: "inventory.delete",
+    entityType: ApprovalEntityType.INVENTORY_ITEM,
+    action: "DELETE",
+    entityId: id,
+    user,
+    payload: {},
+    summary: `Delete Inventory Item '${id}'`,
+    executeDirectly: () =>
+      InventoryItemService.deleteInventoryItem(id, user.id),
+  });
 
   sendResponse(res, {
-    statusCode: httpStatus.OK,
+    statusCode: result.approvalRequired ? httpStatus.ACCEPTED : httpStatus.OK,
     success: true,
-    message: result.message,
-    data: null,
+    message: result.approvalRequired
+      ? "Inventory item deletion submitted for Super Admin approval"
+      : "Inventory item deleted successfully",
+    data: result.data,
   });
 });
 

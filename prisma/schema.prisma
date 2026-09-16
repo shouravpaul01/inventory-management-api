@@ -37,6 +37,7 @@ enum ApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+  RETURN_FOR_CORRECTION
   CANCELLED
 }
 
