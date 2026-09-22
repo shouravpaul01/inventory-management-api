@@ -5,7 +5,6 @@ const createInventoryUnitZodSchema = z.object({
     inventoryItemId: z.string().min(1, "Inventory Item ID is required"),
     uniqueCode: z.string().optional(),
     serialNumber: z.string().optional(),
-    barcode: z.string().optional(),
     condition: z.enum(["NEW", "GOOD", "FAIR", "POOR", "DAMAGED"]).optional().default("NEW"),
     locationId: z.string().optional(),
     purchaseDate: z.string().datetime().optional().or(z.string().date().optional()),
@@ -29,7 +28,6 @@ const batchCreateUnitsZodSchema = z.object({
 const updateInventoryUnitZodSchema = z.object({
   body: z.object({
     serialNumber: z.string().optional(),
-    barcode: z.string().optional(),
     condition: z.enum(["NEW", "GOOD", "FAIR", "POOR", "DAMAGED"]).optional(),
     locationId: z.string().optional(),
     notes: z.string().optional(),

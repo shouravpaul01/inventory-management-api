@@ -114,7 +114,15 @@ const getAllUsers = async (query: Record<string, unknown>) => {
       department: true,
       roles: {
         include: {
-          role: true,
+          role: {
+            include: {
+              permissions: {
+                include: {
+                  permission: true,
+                },
+              },
+            },
+          },
         },
       },
       permissions: {
@@ -127,7 +135,12 @@ const getAllUsers = async (query: Record<string, unknown>) => {
   const data = await queryBuilder.execute();
   const meta = await queryBuilder.countTotal();
 
-  return { meta, data };
+  const formattedData = (data as any[]).map((u) => ({
+    ...u,
+    effectivePermissions: calculateEffectivePermissions(u),
+  }));
+
+  return { meta, data: formattedData };
 };
 
 const getUserById = async (id: string) => {

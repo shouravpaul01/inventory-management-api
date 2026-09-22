@@ -675,10 +675,62 @@ const getAllApprovalRequests = async (query: Record<string, unknown>) => {
       },
     });
 
-  const data = await queryBuilder.execute();
-  const meta = await queryBuilder.countTotal();
+  const baseWhere: Record<string, unknown> = {};
+  if (query.requestedById && typeof query.requestedById === "string") {
+    baseWhere.requestedById = query.requestedById;
+  }
+  if (query.entityType && typeof query.entityType === "string") {
+    baseWhere.entityType = query.entityType;
+  }
 
-  return { meta, data };
+  const [data, meta, pendingCount, approvedCount, rejectedCount, cancelledCount] =
+    await Promise.all([
+      queryBuilder.execute(),
+      queryBuilder.countTotal(),
+      prisma.approvalRequest.count({
+        where: {
+          ...baseWhere,
+          status: ApprovalStatus.PENDING,
+        },
+      }),
+      prisma.approvalRequest.count({
+        where: {
+          ...baseWhere,
+          status: ApprovalStatus.APPROVED,
+        },
+      }),
+      prisma.approvalRequest.count({
+        where: {
+          ...baseWhere,
+          status: {
+            in: [ApprovalStatus.REJECTED, ApprovalStatus.RETURN_FOR_CORRECTION],
+          },
+        },
+      }),
+      prisma.approvalRequest.count({
+        where: {
+          ...baseWhere,
+          status: ApprovalStatus.CANCELLED,
+        },
+      }),
+    ]);
+
+  const enrichedMeta = {
+    ...meta,
+    pendingCount,
+    approvedCount,
+    rejectedCount,
+    cancelledCount,
+    stats: {
+      pending: pendingCount,
+      approved: approvedCount,
+      rejected: rejectedCount,
+      cancelled: cancelledCount,
+      total: (meta as any).total ?? 0,
+    },
+  };
+
+  return { meta: enrichedMeta, data };
 };
 
 const getApprovalRequestById = async (id: string) => {
@@ -812,6 +864,60 @@ const createPolicy = async (
 };
 
 const getAllPolicies = async (query: Record<string, unknown>) => {
+  let searchCondition: Record<string, unknown> | null = null;
+  const rawSearchTerm = query.searchTerm;
+
+  if (typeof rawSearchTerm === "string" && rawSearchTerm.trim() !== "") {
+    const term = rawSearchTerm.trim();
+    const [matchingPermissions, matchingUsers, matchingRoles] = await Promise.all([
+      prisma.permission.findMany({
+        where: {
+          OR: [
+            { name: { contains: term, mode: "insensitive" } },
+            { code: { contains: term, mode: "insensitive" } },
+            { module: { contains: term, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true },
+      }),
+      prisma.user.findMany({
+        where: {
+          OR: [
+            { firstName: { contains: term, mode: "insensitive" } },
+            { lastName: { contains: term, mode: "insensitive" } },
+            { email: { contains: term, mode: "insensitive" } },
+            { employeeId: { contains: term, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true },
+      }),
+      prisma.role.findMany({
+        where: {
+          OR: [
+            { name: { contains: term, mode: "insensitive" } },
+            { code: { contains: term, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    const permIds = matchingPermissions.map((p) => p.id);
+    const uIds = matchingUsers.map((u) => u.id);
+    const rIds = matchingRoles.map((r) => r.id);
+
+    const orList: Record<string, unknown>[] = [];
+    if (permIds.length > 0) orList.push({ permissionId: { in: permIds } });
+    if (uIds.length > 0) orList.push({ userId: { in: uIds } });
+    if (rIds.length > 0) orList.push({ roleId: { in: rIds } });
+
+    if (orList.length > 0) {
+      searchCondition = { OR: orList };
+    } else {
+      searchCondition = { id: { in: [] } };
+    }
+  }
+
   const queryBuilder = new QueryBuilder(prisma.approvalPolicy as any, query, {
     fields: {
       scope: { type: "string", sortable: true, filterable: true },
@@ -822,7 +928,13 @@ const getAllPolicies = async (query: Record<string, unknown>) => {
       isActive: { type: "boolean", sortable: true, filterable: true },
       createdAt: { type: "date", sortable: true, filterable: true },
     },
-  })
+  });
+
+  if (searchCondition) {
+    queryBuilder.rawFilter(searchCondition);
+  }
+
+  queryBuilder
     .filter()
     .sort()
     .paginate()

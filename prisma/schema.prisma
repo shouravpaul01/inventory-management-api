@@ -958,8 +958,6 @@ model InventoryUnit {
 
   serialNumber String?
 
-  barcode String?
-
   qrValue String?
 
   status InventoryUnitStatus @default(IN_STOCK)
@@ -992,7 +990,6 @@ model InventoryUnit {
   @@index([status])
   @@index([currentHolderId])
   @@index([serialNumber])
-  @@index([barcode])
   @@map("inventory_units")
 }
 

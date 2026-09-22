@@ -59,7 +59,6 @@ const createUnit = async (
       inventoryItemId: item.id,
       uniqueCode,
       serialNumber: payload.serialNumber,
-      barcode: payload.barcode || uniqueCode,
       qrValue,
       condition: (payload.condition as ConditionStatus) || ConditionStatus.NEW,
       status: InventoryUnitStatus.IN_STOCK,
@@ -74,21 +73,43 @@ const createUnit = async (
     },
   });
 
-  // Record initial intake stock movement if location was assigned
-  if (payload.locationId && actorId) {
-    const movementNumber = await generateSequentialCode("MOV_SEQ", "MOV");
-    await prisma.stockMovement.create({
-      data: {
-        movementNumber,
-        type: StockMovementType.STOCK_IN,
+  // Record initial intake stock movement and update stock balance if location was assigned
+  if (payload.locationId) {
+    await prisma.stockBalance.upsert({
+      where: {
+        inventoryItemId_locationId: {
+          inventoryItemId: item.id,
+          locationId: payload.locationId,
+        },
+      },
+      update: {
+        quantity: { increment: 1 },
+        availableQuantity: { increment: 1 },
+      },
+      create: {
         inventoryItemId: item.id,
-        inventoryUnitId: unit.id,
+        locationId: payload.locationId,
         quantity: 1,
-        toLocationId: payload.locationId,
-        performedById: actorId,
-        notes: "Initial serialized unit registration into storage",
+        reservedQuantity: 0,
+        availableQuantity: 1,
       },
     });
+
+    if (actorId) {
+      const movementNumber = await generateSequentialCode("MOV_SEQ", "MOV");
+      await prisma.stockMovement.create({
+        data: {
+          movementNumber,
+          type: StockMovementType.STOCK_IN,
+          inventoryItemId: item.id,
+          inventoryUnitId: unit.id,
+          quantity: 1,
+          toLocationId: payload.locationId,
+          performedById: actorId,
+          notes: "Initial serialized unit registration into storage",
+        },
+      });
+    }
   }
 
   // Audit log
@@ -123,6 +144,26 @@ const batchCreateUnits = async (
   if (payload.locationId) {
     const loc = await prisma.stockLocation.findUnique({ where: { id: payload.locationId } });
     if (!loc) throw new ApiError(httpStatus.BAD_REQUEST, "Specified stock location does not exist!");
+
+    await prisma.stockBalance.upsert({
+      where: {
+        inventoryItemId_locationId: {
+          inventoryItemId: item.id,
+          locationId: payload.locationId,
+        },
+      },
+      update: {
+        quantity: { increment: payload.count },
+        availableQuantity: { increment: payload.count },
+      },
+      create: {
+        inventoryItemId: item.id,
+        locationId: payload.locationId,
+        quantity: payload.count,
+        reservedQuantity: 0,
+        availableQuantity: payload.count,
+      },
+    });
   }
 
   const prefix = getAssetPrefix(item.code);
@@ -136,7 +177,6 @@ const batchCreateUnits = async (
       data: {
         inventoryItemId: item.id,
         uniqueCode,
-        barcode: uniqueCode,
         qrValue,
         condition: (payload.condition as ConditionStatus) || ConditionStatus.NEW,
         status: InventoryUnitStatus.IN_STOCK,
@@ -185,7 +225,6 @@ const lookupByCodeOrQr = async (identifier: string) => {
       OR: [
         { uniqueCode: clean },
         { qrValue: clean },
-        { barcode: clean },
         { serialNumber: clean },
       ],
     },
@@ -250,7 +289,6 @@ const getAllUnits = async (query: Record<string, unknown>) => {
     fields: {
       uniqueCode: { type: "string", searchable: true, sortable: true, filterable: true },
       serialNumber: { type: "string", searchable: true, sortable: true, filterable: true },
-      barcode: { type: "string", searchable: true, sortable: true, filterable: true },
       status: { type: "string", sortable: true, filterable: true },
       condition: { type: "string", sortable: true, filterable: true },
       inventoryItemId: { type: "string", filterable: true },
@@ -259,7 +297,7 @@ const getAllUnits = async (query: Record<string, unknown>) => {
       createdAt: { type: "date", sortable: true, filterable: true },
     },
   })
-    .search(["uniqueCode", "serialNumber", "barcode", "notes"])
+    .search(["uniqueCode", "serialNumber", "notes"])
     .filter()
     .sort()
     .paginate()
@@ -352,7 +390,6 @@ const updateUnit = async (
     where: { id },
     data: {
       serialNumber: payload.serialNumber,
-      barcode: payload.barcode,
       condition: payload.condition as ConditionStatus | undefined,
       locationId: payload.locationId,
       notes: payload.notes,
