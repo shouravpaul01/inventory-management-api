@@ -6,7 +6,6 @@ export interface ICreateInventoryUnitPayload {
   inventoryItemId: string;
   uniqueCode?: string;
   serialNumber?: string;
-  barcode?: string;
   condition?: UnitCondition | ConditionStatus;
   locationId?: string;
   purchaseDate?: string;
@@ -26,7 +25,6 @@ export interface IBatchCreateUnitsPayload {
 
 export interface IUpdateInventoryUnitPayload {
   serialNumber?: string;
-  barcode?: string;
   condition?: UnitCondition | ConditionStatus;
   locationId?: string;
   notes?: string;
