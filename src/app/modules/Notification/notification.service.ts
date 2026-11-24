@@ -83,7 +83,7 @@ const createNotificationsForUsers = async (payload: IBulkNotificationPayload) =>
 };
 
 // ════════════════════════════════════════════════════════════
-// 3. NOTIFY BY ROLE (E.G. SUPER_ADMIN, INVENTORY_MANAGER)
+// 3. NOTIFY BY ROLE (E.G. SUPER_ADMIN, STORE_OFFICER)
 // ════════════════════════════════════════════════════════════
 
 const notifyRole = async (payload: IRoleNotificationPayload) => {

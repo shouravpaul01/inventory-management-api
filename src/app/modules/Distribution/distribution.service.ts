@@ -67,8 +67,38 @@ const createDistribution = async (
 
   // 3. Pre-validate stock & units for all lines
   const locationQtyMap: Record<string, number> = {};
+  const issuedNowByReqLine: Record<string, number> = {};
+  const seenUnitIds = new Set<string>();
+  const bulkDemand: Record<string, number> = {};
 
   for (const line of payload.lines) {
+    // Every line must be tied to an approved requisition line, otherwise
+    // stock could be issued beyond what was approved.
+    const reqLine = line.requisitionLineId
+      ? requisition.lines.find((rl) => rl.id === line.requisitionLineId)
+      : undefined;
+    if (!reqLine) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        "Each distribution line must reference a line of the selected requisition."
+      );
+    }
+    if (reqLine.inventoryItemId !== line.inventoryItemId) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        "Distribution line item does not match the requisition line item."
+      );
+    }
+
+    issuedNowByReqLine[reqLine.id] = (issuedNowByReqLine[reqLine.id] || 0) + line.quantity;
+    const remainingQty = reqLine.approvedQty - reqLine.issuedQty;
+    if (issuedNowByReqLine[reqLine.id] > remainingQty) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Cannot issue ${issuedNowByReqLine[reqLine.id]} unit(s): only ${Math.max(remainingQty, 0)} approved quantity remains for this requisition line.`
+      );
+    }
+
     const item = await prisma.inventoryItem.findUnique({
       where: { id: line.inventoryItemId },
     });
@@ -84,6 +114,21 @@ const createDistribution = async (
         );
       }
 
+      if (line.quantity !== 1) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item '${item.name}' is serialized. Issue one physical unit per line (quantity must be 1).`
+        );
+      }
+
+      if (seenUnitIds.has(line.inventoryUnitId)) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "The same serialized unit cannot be issued twice in one distribution."
+        );
+      }
+      seenUnitIds.add(line.inventoryUnitId);
+
       const unit = await prisma.inventoryUnit.findUnique({
         where: { id: line.inventoryUnitId },
       });
@@ -95,6 +140,13 @@ const createDistribution = async (
         );
       }
 
+      if (unit.inventoryItemId !== item.id) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Serialized unit '${unit.uniqueCode}' does not belong to item '${item.name}'.`
+        );
+      }
+
       if (unit.status !== InventoryUnitStatus.IN_STOCK && unit.status !== InventoryUnitStatus.RESERVED) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -102,7 +154,10 @@ const createDistribution = async (
         );
       }
     } else {
-      // BULK stock check
+      // BULK stock check (several lines may draw from the same item/location)
+      const demandKey = `${item.id}:${line.locationId}`;
+      bulkDemand[demandKey] = (bulkDemand[demandKey] || 0) + line.quantity;
+
       const balance = await prisma.stockBalance.findUnique({
         where: {
           inventoryItemId_locationId: {
@@ -112,10 +167,10 @@ const createDistribution = async (
         },
       });
 
-      if (!balance || balance.quantity < line.quantity) {
+      if (!balance || balance.availableQuantity < bulkDemand[demandKey]) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Insufficient stock for item '${item.name}' at location '${line.locationId}'. Available: ${balance?.quantity || 0}, requested: ${line.quantity}.`
+          `Insufficient available stock for item '${item.name}' at the selected location. Available: ${balance?.availableQuantity || 0}, requested: ${bulkDemand[demandKey]}.`
         );
       }
     }
@@ -231,17 +286,19 @@ const createDistribution = async (
     if (line.requisitionLineId) {
       const reqLine = requisition.lines.find((rl) => rl.id === line.requisitionLineId);
       if (reqLine) {
-        const newIssuedQty = reqLine.issuedQty + line.quantity;
-        const lineStatus = DistributionUtils.calculateLineFulfillmentStatus(
-          newIssuedQty,
-          reqLine.approvedQty
-        );
+        // Re-read the current value: several distribution lines can target the same requisition line
+        const current = await prisma.requisitionLine.update({
+          where: { id: line.requisitionLineId },
+          data: { issuedQty: { increment: line.quantity } },
+        });
 
         await prisma.requisitionLine.update({
           where: { id: line.requisitionLineId },
           data: {
-            issuedQty: newIssuedQty,
-            status: lineStatus,
+            status: DistributionUtils.calculateLineFulfillmentStatus(
+              current.issuedQty,
+              reqLine.approvedQty
+            ),
           },
         });
       }
@@ -306,6 +363,16 @@ const confirmDelivery = async (
 
   if (!distribution) {
     throw new ApiError(httpStatus.NOT_FOUND, "Distribution record not found!");
+  }
+
+  // Only the designated receiver (or an issuer/administrator) may confirm receipt
+  const canActForOthers =
+    actor?.isSuperAdmin || actor?.permissions?.includes("distribution.create");
+  if (actor && actor.id !== distribution.receiverId && !canActForOthers) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "Only the designated receiver can confirm delivery of this distribution."
+    );
   }
 
   let signatureUrl: string | undefined = undefined;

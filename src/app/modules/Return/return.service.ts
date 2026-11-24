@@ -34,6 +34,35 @@ const processReturn = async (
     throw new ApiError(httpStatus.NOT_FOUND, "Distribution record not found!");
   }
 
+  // Only the receiver, the issuer, or staff allowed to process returns may return this distribution
+  const canProcessForOthers =
+    processor?.isSuperAdmin || processor?.permissions?.includes("return.process");
+  if (
+    processor &&
+    !canProcessForOthers &&
+    processor.id !== distribution.receiverId &&
+    processor.id !== distribution.issuedById
+  ) {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      "You can only return items that were distributed to you."
+    );
+  }
+
+  // Quantities already returned against this distribution, per item
+  const previousReturnLines = await prisma.returnLine.findMany({
+    where: { returnTransaction: { distributionId: distribution.id } },
+  });
+  const alreadyReturnedByItem: Record<string, number> = {};
+  const returnedUnitIds = new Set<string>();
+  for (const prev of previousReturnLines) {
+    alreadyReturnedByItem[prev.inventoryItemId] =
+      (alreadyReturnedByItem[prev.inventoryItemId] || 0) + prev.quantity;
+    if (prev.inventoryUnitId) returnedUnitIds.add(prev.inventoryUnitId);
+  }
+  const returningNowByItem: Record<string, number> = {};
+  const seenReturnUnitIds = new Set<string>();
+
   // 2. Pre-validate returnability and locations for each line
   for (const line of payload.lines) {
     const item = await prisma.inventoryItem.findUnique({
@@ -42,6 +71,49 @@ const processReturn = async (
 
     if (!item) {
       throw new ApiError(httpStatus.BAD_REQUEST, `Inventory item '${line.inventoryItemId}' not found!`);
+    }
+
+    const issuedLines = distribution.lines.filter((dl) => dl.inventoryItemId === item.id);
+    if (issuedLines.length === 0) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Item '${item.name}' was not issued in distribution '${distribution.distributionNo}'.`
+      );
+    }
+
+    if (item.trackingType === StockTrackingType.SERIALIZED) {
+      if (!line.inventoryUnitId) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item '${item.name}' is serialized. Select the physical unit being returned.`
+        );
+      }
+      if (line.quantity !== 1) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Item '${item.name}' is serialized. Return one unit per line (quantity must be 1).`
+        );
+      }
+      if (!issuedLines.some((dl) => dl.inventoryUnitId === line.inventoryUnitId)) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `The selected unit was not issued in distribution '${distribution.distributionNo}'.`
+        );
+      }
+      if (returnedUnitIds.has(line.inventoryUnitId) || seenReturnUnitIds.has(line.inventoryUnitId)) {
+        throw new ApiError(httpStatus.BAD_REQUEST, "This unit has already been returned.");
+      }
+      seenReturnUnitIds.add(line.inventoryUnitId);
+    } else {
+      const issuedQty = issuedLines.reduce((sum, dl) => sum + dl.quantity, 0);
+      returningNowByItem[item.id] = (returningNowByItem[item.id] || 0) + line.quantity;
+      const outstanding = issuedQty - (alreadyReturnedByItem[item.id] || 0);
+      if (returningNowByItem[item.id] > outstanding) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Cannot return ${returningNowByItem[item.id]} of '${item.name}': only ${Math.max(outstanding, 0)} outstanding from this distribution.`
+        );
+      }
     }
 
     if (!item.isReturnable) {
@@ -78,6 +150,19 @@ const processReturn = async (
 
   const locationQtyMap = ReturnUtils.aggregateReturnLocations(payload.lines);
 
+  // Work out whether this return closes the distribution or only part of it
+  const totalIssuedQty = distribution.lines.reduce((sum, dl) => sum + dl.quantity, 0);
+  const totalReturnedQty =
+    previousReturnLines.reduce((sum, rl) => sum + rl.quantity, 0) +
+    payload.lines.reduce((sum, l) => sum + l.quantity, 0);
+  const requestedStatus = (payload.status as ReturnStatus) || ReturnStatus.RETURNED;
+  const resolvedStatus: ReturnStatus =
+    requestedStatus === ReturnStatus.RETURNED || requestedStatus === ReturnStatus.PARTIALLY_RETURNED
+      ? totalReturnedQty >= totalIssuedQty
+        ? ReturnStatus.RETURNED
+        : ReturnStatus.PARTIALLY_RETURNED
+      : requestedStatus;
+
   // 3. Generate Return Number and Create ReturnTransaction
   const returnNumber = await generateSequentialCode("RET_SEQ", "RET");
 
@@ -86,7 +171,7 @@ const processReturn = async (
       returnNumber,
       distributionId: distribution.id,
       processedById: processor?.id || distribution.issuedById,
-      status: (payload.status as ReturnStatus) || ReturnStatus.RETURNED,
+      status: resolvedStatus,
       returnedAt: new Date(),
       remarks: payload.remarks,
       lines: {
@@ -256,7 +341,7 @@ const processReturn = async (
   );
   if (damagedOrLost.length > 0) {
     await NotificationService.notifyRole({
-      roleCode: "INVENTORY_MANAGER",
+      roleCode: "STORE_OFFICER",
       type: "ALERT",
       title: "Return Condition Alert",
       message: `Return '${returnTransaction.returnNumber}' reported ${damagedOrLost.length} item(s) in DAMAGED/LOST condition!`,

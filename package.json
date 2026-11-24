@@ -1,5 +1,5 @@
 {
-  "name": "backend-nodejs-prisma-starter-kit",
+  "name": "inventory-management-api",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
@@ -12,11 +12,10 @@
     "generate": "ts-node generate-module.ts"
   },
   "keywords": [
-    "web developer",
-    "full stack developer",
-    "backend developer",
-    "software engineer",
-    "backend starter"
+    "inventory",
+    "university",
+    "requisition",
+    "asset tracking"
   ],
   "author": "Shourav Paul",
   "license": "ISC",

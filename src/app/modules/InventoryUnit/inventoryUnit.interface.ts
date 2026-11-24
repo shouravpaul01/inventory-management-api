@@ -1,6 +1,6 @@
 import { ConditionStatus } from "@prisma/client";
 
-export type UnitCondition = "NEW" | "GOOD" | "FAIR" | "POOR" | "DAMAGED";
+export type UnitCondition = "NEW" | "GOOD" | "FAIR" | "DAMAGED";
 
 export interface ICreateInventoryUnitPayload {
   inventoryItemId: string;

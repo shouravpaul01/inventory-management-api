@@ -277,7 +277,10 @@ const submitRequisition = async (id: string, user: IAuthUser) => {
     },
   });
 
-  let newStatus: RequestStatus = RequestStatus.SUBMITTED;
+  // When no approval workflow applies (Super Admin, bypass permission, or an
+  // explicit exemption policy) the requisition is approved immediately.
+  // Otherwise it would sit in SUBMITTED forever, since nobody is assigned to review it.
+  let newStatus: RequestStatus = RequestStatus.APPROVED;
   let approvalRequest = null;
 
   if (approvalCheck.required) {
@@ -340,6 +343,19 @@ const submitRequisition = async (id: string, user: IAuthUser) => {
     }
   }
 
+  if (newStatus === RequestStatus.APPROVED) {
+    // Auto-approved: approve every line in full
+    for (const line of requisition.lines) {
+      await prisma.requisitionLine.update({
+        where: { id: line.id },
+        data: {
+          approvedQty: line.requestedQty,
+          status: RequestLineStatus.APPROVED,
+        },
+      });
+    }
+  }
+
   const updatedRequisition = await prisma.requisition.update({
     where: { id: requisition.id },
     data: {
@@ -380,18 +396,18 @@ const submitRequisition = async (id: string, user: IAuthUser) => {
     userId: user.id,
     type: "REQUISITION",
     title: "Requisition Submitted",
-    message: `Requisition '${requisition.requestNumber}' was submitted successfully.${approvalCheck.required ? " It is currently under review." : " It is ready for processing."}`,
+    message: `Requisition '${requisition.requestNumber}' was submitted successfully.${approvalCheck.required ? " It is currently under review." : " It has been approved and is ready for distribution."}`,
     referenceType: "Requisition",
     referenceId: requisition.id,
   });
 
-  // If no approval workflow was required, alert inventory managers
+  // If no approval workflow was required, alert store officers
   if (!approvalCheck.required) {
     await NotificationService.notifyRole({
-      roleCode: "INVENTORY_MANAGER",
+      roleCode: "STORE_OFFICER",
       type: "REQUISITION",
       title: "New Requisition Ready",
-      message: `Requisition '${requisition.requestNumber}' submitted and ready for distribution.`,
+      message: `Requisition '${requisition.requestNumber}' is approved and ready for distribution.`,
       referenceType: "Requisition",
       referenceId: requisition.id,
     });
@@ -429,6 +445,24 @@ const reviewRequisition = async (
     throw new ApiError(
       httpStatus.BAD_REQUEST,
       `Requisition cannot be reviewed in current status: '${requisition.status}'.`
+    );
+  }
+
+  // A requisition that is routed through the approval engine must be decided
+  // from the Approvals inbox; reviewing it here would leave the approval
+  // request pending and let it overwrite this decision later.
+  const openApproval = await prisma.approvalRequest.findFirst({
+    where: {
+      entityType: ApprovalEntityType.REQUISITION,
+      entityId: requisition.id,
+      status: ApprovalStatus.PENDING,
+    },
+    select: { requestNumber: true },
+  });
+  if (openApproval) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      `This requisition is under approval workflow (${openApproval.requestNumber}). Please decide it from the Approvals inbox.`
     );
   }
 
@@ -534,6 +568,17 @@ const reviewRequisition = async (
     referenceType: "Requisition",
     referenceId: requisition.id,
   });
+
+  if (finalStatus === RequestStatus.APPROVED || finalStatus === RequestStatus.PARTIALLY_APPROVED) {
+    await NotificationService.notifyRole({
+      roleCode: "STORE_OFFICER",
+      type: "REQUISITION",
+      title: "Requisition Ready for Distribution",
+      message: `Requisition '${requisition.requestNumber}' has been approved and is ready for distribution.`,
+      referenceType: "Requisition",
+      referenceId: requisition.id,
+    });
+  }
 
   return updatedRequisition;
 };

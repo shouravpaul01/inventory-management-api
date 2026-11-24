@@ -11,6 +11,7 @@ import {
 } from "@prisma/client";
 import { generateSequentialCode } from "../../../helpers/sequenceGenerator";
 import { AuditService } from "../Audit/audit.service";
+import { NotificationService } from "../Notification/notification.service";
 
 /**
  * Universal Approval Execution Engine
@@ -305,6 +306,18 @@ export const executeApprovedRequest = async (
 
       if (!reqRecord) throw new ApiError(httpStatus.NOT_FOUND, "Target requisition not found!");
 
+      // Never resurrect a requisition that has already moved on (cancelled,
+      // rejected, partially/fully issued, ...) back to APPROVED.
+      if (
+        reqRecord.status !== RequestStatus.UNDER_REVIEW &&
+        reqRecord.status !== RequestStatus.SUBMITTED
+      ) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Requisition '${reqRecord.requestNumber}' is '${reqRecord.status}' and can no longer be approved through this request.`
+        );
+      }
+
       // 2. Set all lines to APPROVED and approvedQty = requestedQty
       await prisma.requisitionLine.updateMany({
         where: { requisitionId: targetReqId },
@@ -343,6 +356,23 @@ export const executeApprovedRequest = async (
         entityId: targetReqId,
         actorId,
         metadata: { requestNumber: reqRecord.requestNumber, status: RequestStatus.APPROVED },
+      });
+
+      await NotificationService.createNotification({
+        userId: reqRecord.requesterId,
+        type: "REQUISITION",
+        title: "Requisition Approved",
+        message: `Your requisition '${reqRecord.requestNumber}' has been approved and is pending distribution.`,
+        referenceType: "Requisition",
+        referenceId: reqRecord.id,
+      });
+      await NotificationService.notifyRole({
+        roleCode: "STORE_OFFICER",
+        type: "REQUISITION",
+        title: "Requisition Ready for Distribution",
+        message: `Requisition '${reqRecord.requestNumber}' has been approved and is ready for distribution.`,
+        referenceType: "Requisition",
+        referenceId: reqRecord.id,
       });
       break;
     }

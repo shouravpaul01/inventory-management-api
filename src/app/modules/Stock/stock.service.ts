@@ -800,7 +800,7 @@ const adjustStock = async (
       select: { name: true, code: true },
     });
     await NotificationService.notifyRole({
-      roleCode: "INVENTORY_MANAGER",
+      roleCode: "STORE_OFFICER",
       type: "STOCK",
       title: "Stock Adjustment Alert",
       message: `Stock for '${item?.name || payload.inventoryItemId}' was adjusted downward by ${Math.abs(diff)} units (Available: ${newAvailable}). Reason: ${payload.notes}`,
